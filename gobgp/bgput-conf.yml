@@ -1,0 +1,11 @@
+global:
+    config:
+        as: 30
+        router-id: 10.1.0.1
+neighbors:
+    - config:
+        neighbor-address: 10.1.0.2
+        peer-as: 30
+    - config:
+        neighbor-address: 10.0.0.2
+        peer-as: 20

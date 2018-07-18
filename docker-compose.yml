@@ -1,0 +1,65 @@
+version: "2.1"
+
+# Must define these in the shell
+# global:
+#   environment:
+#       PFX4: 10.1
+#       PFX6: fc01:1
+#       IMAGES_DIR:  /var/tftp/images
+    # cap_add:
+    #   - NET_ADMIN
+    #   - SYS_ADMIN
+
+services:
+  # AS 20 - inject 500k/s 2.5M total - remote AS 30
+  # Single interface.
+  # - Wait for trigger that the BGP receiver [? chopps: has got them?]
+  # - Loop
+  #   - Send 250K DOWN from previous set
+  #   - Send 250K UP new prefixes (not sent previously).
+  #   - Wait for trigger that the BGP receiver [? chopps: has got them?]
+  ebgp:
+    image: bgptest
+    command:
+      gobgpd -t yaml -f /bgptest/gobgp/ebgp-conf.yml
+    volumes:
+      - .:/bgptest"
+    networks:
+      ebgpnet:
+        ipv4_address: 10.0.0.2
+        ipv6_address: fc00::2
+  bgput:
+    image: bgptest
+    command: gobgpd -t yaml -f /bgptest/gobgp/bgput-conf.yml
+    volumes:
+      - .:/bgptest"
+    networks:
+      ebgpnet:
+        ipv4_address: 10.0.0.1
+        ipv6_address: fc00::1
+      ibgpnet:
+        ipv4_address: 10.1.0.1
+        ipv6_address: fc01::1
+  ibgp:
+    image: bgptest
+    command: gobgpd -t yaml -f /bgptest/gobgp/ibgp-conf.yml
+    volumes:
+      - .:/bgptest
+    networks:
+      ibgpnet:
+        ipv4_address: 10.1.0.2
+        ipv6_address: fc01::2
+
+networks:
+  ebgpnet:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.0.0.0/16
+        - subnet: fc00::/64
+  ibgpnet:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.1.0.0/16
+        - subnet: fc01::/64
