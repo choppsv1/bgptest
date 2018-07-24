@@ -10,7 +10,6 @@ version: "2.1"
     #   - NET_ADMIN
     #   - SYS_ADMIN
 
-services:
   # AS 20 - inject 500k/s 2.5M total - remote AS 30
   # Single interface.
   # - Wait for trigger that the BGP receiver [? chopps: has got them?]
@@ -18,48 +17,60 @@ services:
   #   - Send 250K DOWN from previous set
   #   - Send 250K UP new prefixes (not sent previously).
   #   - Wait for trigger that the BGP receiver [? chopps: has got them?]
+
+services:
+
+  # AS 20 - inject 500k/s 2.5M total
   ebgp:
     image: bgptest
-    command:
-      gobgpd -t yaml -f /bgptest/gobgp/ebgp-conf.yml
+    # command: bgpsim -f /bgptest/bgpsim.conf -v
+    # command: bash -c 'sbgp -a -v -o /bgptest/sbgp.out AS20 10.0.0.30 AS30'
+    command: gobgpd -t yaml -f /bgptest/conf/gobgp-ebgp.yml
     volumes:
-      - .:/bgptest"
+      - .:/bgptest
+    ports:
+      - 5674:5674
     networks:
       ebgpnet:
-        ipv4_address: 10.0.0.2
-        ipv6_address: fc00::2
+        ipv4_address: 10.0.0.20
+        ipv6_address: fc00::20
+
+  # AS 30 - receive 500k/s 2.5M total
   bgput:
     image: bgptest
-    command: gobgpd -t yaml -f /bgptest/gobgp/bgput-conf.yml
+    # command: gobgpd -t yaml -f /bgptest/conf/gobgp-bgput.yml
+    command: bash -c 'mkdir -p /run/bird && bird -dc /bgptest/conf/bird-bgput.conf'
     volumes:
-      - .:/bgptest"
+      - .:/bgptest
     networks:
       ebgpnet:
-        ipv4_address: 10.0.0.1
-        ipv6_address: fc00::1
+        ipv4_address: 10.0.0.30
+        ipv6_address: fc00::30
       ibgpnet:
-        ipv4_address: 10.1.0.1
-        ipv6_address: fc01::1
+        ipv4_address: 10.0.1.30
+        ipv6_address: fc01::30
+  # AS 30 - receive 500k/s 2.5M total
   ibgp:
     image: bgptest
-    command: gobgpd -t yaml -f /bgptest/gobgp/ibgp-conf.yml
+    # command: sbgp -a -v -o /bgptest/sbgp-ibgp.out AS30 10.0.1.30 AS30
+    command: bash -c 'mkdir -p /run/bird && bird -dc /bgptest/conf/bird-ibgp.conf'
     volumes:
       - .:/bgptest
     networks:
       ibgpnet:
-        ipv4_address: 10.1.0.2
-        ipv6_address: fc01::2
+        ipv4_address: 10.0.1.31
+        ipv6_address: fc01::31
 
 networks:
   ebgpnet:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: 10.0.0.0/16
+        - subnet: 10.0.0.0/24
         - subnet: fc00::/64
   ibgpnet:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: 10.1.0.0/16
+        - subnet: 10.0.1.0/24
         - subnet: fc01::/64

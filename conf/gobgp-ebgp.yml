@@ -1,0 +1,29 @@
+global:
+  config:
+    as: 20
+    router-id: 192.168.20.1
+  apply-policy:
+    config:
+      default-import-policy: = "accept-route"
+      default-export-policy: = "accept-route"
+      # import-policy-list:
+      #   - "policy1"
+      # default-import-policy: "reject-route"
+      # export-policy-list:
+      #   - "policy2"
+neighbors:
+  - config:
+      neighbor-address: 10.0.0.30
+      peer-as: 30
+    afi-safis:
+      - config:
+          afi-safi-name: ipv6-unicast
+      - config:
+          afi-safi-name: ipv4-unicast
+
+defined-sets:
+  prefix-sets:
+    - prefix-set-name: "ps0"
+      prefix-list:
+        - ip-prefix: "10.0.0.0/8"
+          masklength-range: "24..32"

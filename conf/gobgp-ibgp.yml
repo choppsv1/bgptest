@@ -1,0 +1,17 @@
+global:
+  config:
+    as: 30
+    router-id: 10.0.1.31
+  apply-policy:
+    config:
+      default-import-policy: = "accept-route"
+      default-export-policy: = "accept-route"
+neighbors:
+  - config:
+      neighbor-address: 10.0.1.30
+      peer-as: 30
+    afi-safis:
+      - config:
+          afi-safi-name: ipv6-unicast
+      - config:
+          afi-safi-name: ipv4-unicast

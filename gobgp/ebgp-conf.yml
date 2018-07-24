@@ -1,8 +1,0 @@
-global:
-    config:
-        as: 20
-        router-id: 192.168.20.1
-neighbors:
-    - config:
-        neighbor-address: 10.0.0.1
-        peer-as: 30

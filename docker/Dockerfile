@@ -1,8 +1,8 @@
 FROM gitlab.dev.terastrm.net:4567/terastream/ci-dockerfiles/ts-ubuntu-ci-18:latest
 RUN apt-get update -qy && apt-get upgrade -y && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            bash bash-completion bsdtar cpio curl \
-            docker-ce git iputils-ping gettext jq kmod \
+            bash bash-completion bird bsdtar cpio curl \
+            docker-ce git iputils-ping gettext jq kmod logrotate \
             libc-ares2 libev4 libxml2-utils locales lvm2 make net-tools \
             netcat-openbsd nfs-kernel-server ntp \
             openjdk-8-jre openjdk-8-jdk \
@@ -13,7 +13,6 @@ RUN apt-get update -qy && apt-get upgrade -y && \
             autoconf build-essential libev-dev libxslt-dev \
             libffi-dev libssl-dev zlib1g-dev \
             libgmp-dev zlib1g-dev libedit-dev
-# RUN apt install -y golang
 # Golang
 # RUN snap install go --classic
 # FRR routing
@@ -24,7 +23,6 @@ RUN python3.6 -m pip install -U \
     coverage cryptography docker lxml netconf nose pylint pysnmp \
     pytest pyyaml tox twine wheel
 # Required by frr
-RUN apt install -y logrotate
 RUN apt-get autoremove -y && apt-get clean -y
 COPY go1.10.3.linux-amd64.tar.gz /
 RUN tar -C /usr/local -xzf /go1.10.3.linux-amd64.tar.gz
@@ -39,3 +37,5 @@ RUN go get github.com/osrg/gobgp || true
 RUN (cd /go/src/github.com/osrg/gobgp && /go/bin/dep ensure)
 RUN (cd /go/src/github.com/osrg/gobgp/cmd/gobgp && go install) && \
     (cd /go/src/github.com/osrg/gobgp/cmd/gobgpd && go install)
+COPY mrtbin/* /usr/bin/
+RUN python3 -m pip install exabgp ryu

@@ -1,18 +1,18 @@
-BOX=bionic
+BOX=bgp-bionic
 VERSION := $(shell cat VERSION)
 
-all: bionic.box
+all: bgp-bionic.box
 
 clean:
-	rm -f bionic.box
+	rm -f bgp-bionic.box
 	vagrant destroy -f
 
-bionic.box: Vagrantfile
-	rm -f bionic.box
+bgp-bionic.box: Vagrantfile
+	rm -f bgp-bionic.box
 	vagrant destroy -f
 	vagrant box update
 	vagrant --verbose up  | tee box-build.txt
-	vagrant package --output bionic.box
+	vagrant package --output bgp-bionic.box
 
-release: bionic.box
+release: bgp-bionic.box
 	ruby ./release.rb

@@ -6,7 +6,7 @@ require 'optparse'
 token = `secret-tool lookup passwords vagrant-token`.strip
 version = File.read('VERSION').strip
 user = ENV['USER']
-box = "bionic"
+box = "bgp-bionic"
 
 api = HTTP.persistent("https://app.vagrantup.com").headers(
     "Content-Type" => "application/json",
@@ -65,7 +65,7 @@ upload_path = response.parse['upload_path']
 puts "uploading provider: #{version}"
 HTTP.put upload_path, body: File.open("#{box}.box")
 
-#system "curl --fail --header \"Authorization: Bearer #{token}\" #{upload_path} --request PUT --upload-file bionic.box"
+#system "curl --fail --header \"Authorization: Bearer #{token}\" #{upload_path} --request PUT --upload-file #{box}.box"
 #$?.success? or raise "Failed upload: #{version}"
 # # -------------------
 # # Update the provider
