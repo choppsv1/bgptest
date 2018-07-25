@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 eval: (yapf-mode 1) -*-
 #
 # July 20 2018, Christian E. Hopps <chopps@gmail.com>
@@ -234,7 +235,7 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
     count = 0
     for rprefix in prefix.subnets(new_prefix=sublen):
         if (count % 10000) == 0:
-            print("{}".format(count))
+            print("routes: {}".format(count), end='\r')
 
         p = packprefix(rprefix)
         plen = len(p)
