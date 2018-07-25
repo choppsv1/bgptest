@@ -61,6 +61,12 @@ BGPAT_ASPATH_ST_SEQ = 2
 BGP_ASPATH_VALUE_20 = b"\x40\x02\x06\x02\x01\x00\x00\x00\x14"
 
 BGPAT_NEXTHOP = 3
+BGPAT_MP_REACH_NLRI = 14
+BGPAT_MP_UNREACH_NLRI = 15
+
+MPBGP_IPV4_AFI = 1
+MPBGP_IPV6_AFI = 2
+MPBGP_UNICAST_SAFI = 1
 
 
 def packprefix(prefix):
@@ -89,6 +95,175 @@ def packprefix(prefix):
 # +-----------------------------------------------------+
 # |   Network Layer Reachability Information (variable) |
 # +-----------------------------------------------------+
+
+# MPATTR
+# +---------------------------------------------------------+
+# | Address Family Identifier (2 octets)                    |
+# +---------------------------------------------------------+
+# | Subsequent Address Family Identifier (1 octet)          |
+# +---------------------------------------------------------+
+# | Length of Next Hop Network Address (1 octet)            |
+# +---------------------------------------------------------+
+# | Network Address of Next Hop (variable)                  |
+# +---------------------------------------------------------+
+# | Number of SNPAs (1 octet)                               |
+# +---------------------------------------------------------+
+# | Length of first SNPA(1 octet)                           |
+# +---------------------------------------------------------+
+# | First SNPA (variable)                                   |
+# +---------------------------------------------------------+
+# | Length of second SNPA (1 octet)                         |
+# +---------------------------------------------------------+
+# | Second SNPA (variable)                                  |
+# +---------------------------------------------------------+
+# | ...                                                     |
+# +---------------------------------------------------------+
+# | Length of Last SNPA (1 octet)                           |
+# +---------------------------------------------------------+
+# | Last SNPA (variable)                                    |
+# +---------------------------------------------------------+
+# | Network Layer Reachability Information (variable)       |
+# +---------------------------------------------------------+
+
+BGP_MAX_UPDATE_LEN = 4096 - 19
+
+
+def make_msg(typ, data):
+    marker = bytes((0xff, )) * 16
+    return marker + struct.pack("!HB", len(data) + 19, typ) + data
+
+
+def get_attrs(aslist, nexthop):
+    # ------
+    # Origin
+    # ------
+    attrs = BGP_ORIGIN_VALUE_IGP
+
+    # -------
+    # AS-PATH
+    # -------
+    acount = len(aslist)
+    # if as4:
+    if True:  # pylint: disable=W0125
+        alen = 2 + 4 * acount
+        afmt = "!L"
+    else:
+        alen = 2 + 2 * acount
+        afmt = "!H"
+    aspath = struct.pack("!BBBBB", BGPAF_TRANS, BGPAT_ASPATH, alen,
+                         BGPAT_ASPATH_ST_SEQ, acount)
+    for asn in aslist:
+        aspath += struct.pack(afmt, asn)
+    attrs += aspath
+
+    if nexthop.version == 4:
+        # --------
+        # Next-Hop
+        # --------
+        attrs += bytes((BGPAF_TRANS, BGPAT_NEXTHOP, len(nexthop.packed)))
+        assert len(nexthop.packed) == 4
+        attrs += nexthop.packed
+        mpattr = b""
+    else:
+        # Now add IPv6 multiprotocol attr
+        mpattr = bytes((
+            BGPAF_OPTIONAL | BGPAF_LONGLEN,
+            BGPAT_MP_REACH_NLRI,
+        ))
+        # pad for len, afi, safi, nhlen, nh
+        mpattr += struct.pack("!HHBB", 0, MPBGP_IPV6_AFI, MPBGP_UNICAST_SAFI,
+                              len(nexthop.packed))
+        mpattr += nexthop.packed
+        # 0 SNPA
+        mpattr += b"\x00"
+
+    return attrs, mpattr
+
+
+def get_update_header(aslist, nexthop):
+    # No withdraw, add attributes
+    attrs, mpattr = get_attrs(aslist, nexthop)
+    alen = len(attrs) + len(mpattr)
+    # data = struct.pack("!HH", 0, len(attrs)) + attrs
+    return attrs, mpattr, 4096 - 23 - alen
+
+
+# Pack as many NRLI into a single update as possible
+def gen_routes_update(  # pylint: disable=R0913,R0914
+        outfile,  # pylint: disable=R0913,R0914
+        prefix,  # pylint: disable=R0913,R0914
+        sublen,  # pylint: disable=R0913,R0914
+        nexthop,  # pylint: disable=R0913,R0914
+        maxpack,  # pylint: disable=R0913,R0914
+        maxroute,  # pylint: disable=R0913,R0914
+        aspath,  # pylint: disable=R0913,R0914
+        incroot,  # pylint: disable=R0913,R0914
+        modroot):  # pylint: disable=R0913,R0914
+    # print(prefix, sublen, seqno)
+
+    def write_update(attrs, mpattr, nlri):
+        # BGP Header: marker[16], len[2], type[1]
+        alen = len(attrs)
+        if mpattr:
+            alen = len(attrs) + len(mpattr) + len(nlri)
+            mlen = alen
+        else:
+            alen = len(attrs)
+            mlen = alen + len(nlri)
+        # message len is + 16 (marker) + 2 (len) + 1 (type) + 2 (withlen) + 2 (attrlen)
+        msghdr = bytes((0xff, )) * 16 + \
+            struct.pack("!HB", mlen + 23, BGP_MSGTYPE_UPDATE) + \
+            struct.pack("!HH", 0, alen) # 0 withdraw, attrlen
+        # header
+        outfile.write(msghdr)
+        # attrs
+        outfile.write(attrs)
+        if mpattr:
+            # mpattr 1 flags, 1 type, 2 length of mpattr value + nlri, rest of mpattr and nrli
+            mplen = len(mpattr[4:]) + len(nlri)
+            mpattr = mpattr[:2] + struct.pack("!H", mplen) + mpattr[4:]
+            outfile.write(mpattr)
+        outfile.write(nlri)
+
+    aslist = [int(x) for x in aspath if x]
+    rootas = aslist[-1]
+    attrs, mpattr, remain = get_update_header(aslist, nexthop)
+    nlri = b""
+    ucount = 0
+    mcount = 0
+    count = 0
+    for rprefix in prefix.subnets(new_prefix=sublen):
+        if (count % 10000) == 0:
+            print("{}".format(count))
+
+        p = packprefix(rprefix)
+        plen = len(p)
+        if plen > remain or mcount == maxpack:
+            write_update(attrs, mpattr, nlri)
+            ucount += 1
+            attrs, mpattr, remain = get_update_header(aslist, nexthop)
+            nlri = b""
+            mcount = 0
+
+        nlri += p
+        remain -= plen
+        count += 1
+        mcount += 1
+
+        if incroot:
+            aslist[-1] += 1
+            if modroot:
+                aslist[-1] %= modroot
+
+        if count == maxroute:
+            break
+
+    if mcount:
+        write_update(attrs, mpattr, nlri)
+        ucount += 1
+
+    return ucount, count
+
 
 # ---------
 # MRTHeader
@@ -262,55 +437,101 @@ def triples(l):
 
 def main():
     parser = argparse.ArgumentParser("Inject BGP route file into peer")
-    # parser.add_argument("-a", "--ascii", action="store_true", help="Output ASCII")
     parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging")
-    # parser.add_argument(
-    #     "-r", "--router-id", default="10.0.0.1", help="BGP Router ID")
+    parser.add_argument(
+        "--root-as-inc", action="store_true", help="increment the root as")
+    parser.add_argument(
+        "--root-as-mod",
+        type=int,
+        default=0,
+        help="modulus the incrementing root as")
+    parser.add_argument(
+        "--aspath", default="20", help="comma sep list of asnumbers")
+    parser.add_argument(
+        "-m",
+        "--max-routes",
+        type=int,
+        default=0xFFFFFFFF,
+        help="Maximum number of prefixes to generate [default: 4 billion]")
+    parser.add_argument(
+        "--max-pack",
+        type=int,
+        default=0xFFFF,
+        help="Maximum number of prefixes to generate [default: 4 billion]")
     parser.add_argument(
         "-p",
         "--peers",
         help="Space sep list of peers in form peerid,peerip,peeras")
     parser.add_argument(
-        "-o", "--output", default="-", help="File to read write to")
+        "-t", "--tabledump", help="File to write MRT table dump into")
+    parser.add_argument(
+        "-u", "--update", help="File to write BGP updates into")
     parser.add_argument(
         "tuples", nargs="*", help="PREFIX SUBLEN NEXTHOP pairs")
     args = parser.parse_args()
 
-    if not args.output:
-        outfile = sys.stdout.buffer
-    else:
-        outfile = open(args.output, "wb")
+    if args.update:
+        aspath = args.aspath.split(",")
+        incroot = args.root_as_inc
+        modroot = args.root_as_mod
+        maxroute = args.max_routes
+        maxpack = args.max_pack
+        if args.update == "-":
+            assert args.tabledump != "-"
+            outfile = sys.stdout.buffer
+        else:
+            outfile = open(args.update, "wb")
+        routecount = 0
+        updatecount = 0
+        for pfx, sublen, nexthop in triples(args.tuples):
+            prefix = ipaddress.ip_network(pfx)
+            nexthop = ipaddress.ip_address(nexthop)
+            assert prefix.version == nexthop.version
+            ucount, count = gen_routes_update(outfile, prefix, int(sublen),
+                                              nexthop, maxpack, maxroute,
+                                              aspath, incroot, modroot)
+            updatecount += ucount
+            routecount += count
+            maxroute -= count
+            if maxroute <= 0:
+                break
+        print("Wrote {} BGP updates with {} total NLRI".format(
+            updatecount, routecount))
 
-    # router_id = ipaddress.ip_address(args.router_id)
+    if args.tabledump:
+        if args.tabledump == "-":
+            assert args.upddate != "-"
+            outfile = sys.stdout.buffer
+        else:
+            outfile = open(args.tabledump, "wb")
+        # -------------------------
+        # Generate Peer Index Table
+        # -------------------------
 
-    # -------------------------
-    # Generate Peer Index Table
-    # -------------------------
+        peerlist = [X.split(",") for X in args.peers.split()]
+        peers = [(ipaddress.ip_address(x), ipaddress.ip_address(y), int(z))
+                 for x, y, z in peerlist]
+        peerfile = io.BytesIO()
+        genpeers(peerfile, peers)
+        mrtencode(outfile, MRT_TYPE_TABLE_DUMP_V2, TD_STYPE_PEER_INDEX_TABLE,
+                  peerfile.getvalue())
 
-    peerlist = [X.split(",") for X in args.peers.split()]
-    peers = [(ipaddress.ip_address(x), ipaddress.ip_address(y), int(z))
-             for x, y, z in peerlist]
-    peerfile = io.BytesIO()
-    genpeers(peerfile, peers)
-    mrtencode(outfile, MRT_TYPE_TABLE_DUMP_V2, TD_STYPE_PEER_INDEX_TABLE,
-              peerfile.getvalue())
+        if len(args.tuples) % 3:
+            # print("Prefix sublen args must come in pairs\n")
+            sys.exit(1)
 
-    if len(args.tuples) % 3:
-        # print("Prefix sublen args must come in pairs\n")
-        sys.exit(1)
+        # ---------------
+        # Generate Routes
+        # ---------------
 
-    # ---------------
-    # Generate Routes
-    # ---------------
-
-    seqno = 0
-    for pfx, sublen, nexthop in triples(args.tuples):
-        prefix = ipaddress.ip_network(pfx)
-        nexthop = ipaddress.ip_address(nexthop)
-        assert prefix.version == nexthop.version
-        seqno = genroutes(outfile, prefix, int(sublen), nexthop, seqno)
-    print("{}".format(seqno))
+        seqno = 0
+        for pfx, sublen, nexthop in triples(args.tuples):
+            prefix = ipaddress.ip_network(pfx)
+            nexthop = ipaddress.ip_address(nexthop)
+            assert prefix.version == nexthop.version
+            seqno = genroutes(outfile, prefix, int(sublen), nexthop, seqno)
+        print("{}".format(seqno))
 
 
 if __name__ == "__main__":

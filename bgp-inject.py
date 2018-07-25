@@ -27,19 +27,165 @@ import os
 import pwd
 import sys
 import socket
+import struct
+import tempfile
 import traceback
 from struct import unpack
 import time
 
 log = logging.getLogger("BGP-INJECT")
-log.addHandler(logging.StreamHandler(sys.stderr))
+# handler = logging.StreamHandler(sys.stderr)
+# handler.setLevel(logging.DEBUG)
+# log.setLevel(logging.DEBUG)
+# log.addHandler(handler)
+
+BGP_VERSION = 4
+BGP_MSG_TYPE_OPEN = 1
+BGP_MSG_TYPE_UPDATE = 2
+BGP_MSG_TYPE_NOTIFICATION = 3
+BGP_MSG_TYPE_KEEPALIVE = 4
+
+AS_TRANS = 23456
+BGP_OPT_TYPE_CAP = 2
+BGP_CAP_TYPE_MPBGP = 1
+BGP_CAP_TYPE_AS4 = 65
+BGP_ATTR_TYPE_AS4_PATH = 17
+
+MPBGP_IPV4_AFI = 1
+MPBGP_IPV6_AFI = 2
+MPBGP_UNICAST_SAFI = 1
+
+
+def ours(localip, routerid, asn, peerip, peerport, peeras, rawfile):
+    def get_msg(s, buf):
+        reqlen = 18
+        while reqlen > 0:
+            buf += s.recv(reqlen)
+            reqlen = 18 - len(buf)
+        totlen = struct.unpack("!H", buf[16:18])[0]
+        reqlen = totlen - 18
+        assert reqlen > 0
+        while reqlen > 0:
+            buf += s.recv(reqlen)
+            reqlen = totlen - len(buf)
+        return buf[:totlen], buf[totlen:]
+
+    def make_msg(typ, data):
+        marker = bytes((0xff, )) * 16
+        return marker + struct.pack("!HB", len(data) + 19, typ) + data
+
+    connected = False
+    recvbuf = b""
+    while not connected:
+        try:
+            sock = socket.create_connection((str(peerip), peerport))
+        except socket.error:
+            log.warning("Failed to connect sleeping 5s")
+            time.sleep(5)
+            continue
+
+        if asn > 0xFFFF:
+            open_asn = AS_TRANS
+        else:
+            open_asn = asn
+
+        log.info("CONNECT %s", str((peerip, peerport)))
+
+        data = struct.pack("!BHH", BGP_VERSION, open_asn, 120)
+        data += routerid.packed
+        # Add optional params
+        cap = b""
+        if peerip.version == 6:
+            # Add MPBGP capability
+            cap += struct.pack("!BBHBB", BGP_CAP_TYPE_MPBGP, 4, MPBGP_IPV4_AFI,
+                               0, MPBGP_UNICAST_SAFI)
+        # Add AS4 capability
+        cap += struct.pack("!BBL", BGP_CAP_TYPE_AS4, 4, asn)
+        opt = struct.pack("!BB", BGP_OPT_TYPE_CAP, len(cap))
+        opt += cap
+        data += bytes((len(opt), )) + opt
+        sock.send(make_msg(BGP_MSG_TYPE_OPEN, data))
+
+        log.info("SENT OPEN %s", str((peerip, peerport)))
+
+        # Receive the peer's open message.
+        openmsg, recvbuf = get_msg(sock, recvbuf)
+        msgtype = openmsg[18:19][0]
+
+        if msgtype != BGP_MSG_TYPE_OPEN:
+            log.error("Unexpected message type %d during CONNECT", msgtype)
+            log.warning("Failed to connect sleeping 5s")
+            sock.close()
+            time.sleep(5)
+            continue
+
+        log.info("OPENCONFRIM %s", str((peerip, peerport)))
+
+        kamsg = make_msg(BGP_MSG_TYPE_KEEPALIVE, b"")
+        sent = sock.send(kamsg)
+        if sent != len(kamsg):
+            log.warning("Failed to send keepalive sleeping 5s")
+            sock.close()
+            time.sleep(5)
+            continue
+
+        # Receive the peer's keepalive message.
+        keepalive, recvbuf = get_msg(sock, recvbuf)
+        msgtype = keepalive[18:19][0]
+        if msgtype != BGP_MSG_TYPE_KEEPALIVE and msgtype != BGP_MSG_TYPE_UPDATE:
+            log.error("Unexpected message type %d during OPEN", msgtype)
+            log.warning("Failed to connect sleeping 5s")
+            sock.close()
+            time.sleep(5)
+            continue
+
+        connected = True
+        log.info("ESTABLISHED %s (assuming 4-octet AS numbers)",
+                 str((peerip, peerport)))
+        break
+
+    log.info("Loading raw data from %s", rawfile)
+    start_time = time.time()
+    with open(rawfile, "rb") as rawf:
+        data = rawf.read()
+        dlen = len(data)
+        sent = 0
+        while dlen > 0:
+            log.info("Sending %d bytes of raw data to %s", dlen,
+                     str((peerip, peerport)))
+            once = sock.send(data)
+            if not once:
+                log.info("Error sending %d bytes to ", dlen,
+                         str((peerip, peerport)))
+            data = data[once:]
+            dlen -= once
+    # This doesn't work unfortunately
+    # while True:
+    #     SIOCOUTQ = 0x00005411
+    #     ioctl.ioctl(sock, SIOCOUTQ, 0)
+    stop_time = time.time()
+    log.info("Done sending after %s to %s", str(stop_time - start_time),
+             str((peerip, peerport)))
+
+    while True:
+        kamsg = make_msg(BGP_MSG_TYPE_KEEPALIVE, b"")
+        sent = sock.send(kamsg)
+        if sent != len(kamsg):
+            log.warning("Failed to send keepalive!")
+            sock.close()
+            sys.exit(1)
+        log.info("Sent KeepAlive to %s sleeping 30s", str((peerip, peerport)))
+        time.sleep(30)
 
 
 def exabgp(localip, routerid, asn, peerip, peerport, peeras):
     from exabgp.reactor.api.command.command import Command
     from exabgp.reactor.api.command.limit import match_neighbors
     from exabgp.reactor.api.command.limit import extract_neighbors
+    from exabgp.reactor.loop import Reactor
 
+    # Extend ExaBGP to handle a "send-raw-data [[neighbor IP] ...] filename" command to cram raw
+    # data down the peers throat as fast as possible (limited by kernel syscall).
     @Command.register('text', 'send-raw-data')
     def send_raw_data(self, reactor, service, line):
         def callback():
@@ -53,22 +199,65 @@ def exabgp(localip, routerid, asn, peerip, peerport, peeras):
                     yield True
                     return
 
-                # filename, _ = command.split(' ', 1)
                 with open(command, "rb") as datafile:
                     rawdata = datafile.read()
 
                 assert rawdata
-                self.connection.writer(rawdata)
+                for peer in peers:
+                    log.info("send-raw-data: %d bytes to %s", len(rawdata),
+                             str(peer))
+                    peer.proto.connection.writer(rawdata)
+
                 reactor.processes.answer_done(service)
-            except Exception:
-                self.log_failure('issue parsing the route')
+            except Exception as ex:
+                self.log_failure('issue with send-raw-data: ' + str(ex))
                 reactor.processes.answer(service, 'error')
                 yield True
-            except IndexError:
-                self.log_failure('issue parsing the route')
-                reactor.processes.answer(service, 'error')
-                yield True
-            reactor.asynchronous.schedule(service, line, callback())
+
+        reactor.asynchronous.schedule(service, line, callback())
+
+    # from exabgp.pplication.bgp import main
+    from exabgp.application.bgp import __exit
+    from exabgp.debug import setup_report
+    setup_report()
+    from exabgp.configuration.setup import environment
+    env = environment.setup("/nofile")
+
+    with tempfile.NamedTemporaryFile(mode='w') as scriptfile:
+        scriptfile.write("""#!/bin/bash
+while read nchange; do
+    echo $nchange >> /tmp/bgp-script-out.txt
+    if [[ $(echo $nchange | sed '/neighbor {} up/!d') ]]; then
+        echo send-raw-data foobar.raw
+    fi
+done
+""".format(peerip))
+        scriptfile.flush()
+        os.system("chmod 755 " + scriptfile.name)
+
+        with tempfile.NamedTemporaryFile(mode='w') as conffile:
+            conffile.write("""
+    process senddata {{
+        run bash {};
+        encoder text;
+    }}
+
+    neighbor {} {{                 # Remote neighbor to peer with
+        router-id {};              # Our local router-id
+        local-address {};          # Our local update-source
+        local-as {};               # Our local AS
+        peer-as {};                # Peer's AS
+
+        api {{
+            processes [senddata];
+            neighbor-changes;
+        }}
+    }}
+        """.format(scriptfile.name, peerip, routerid, localip, asn, peeras))
+            conffile.flush()
+            root = os.getcwd()
+            exit_code = Reactor([conffile.name]).run(False, root)
+            __exit(env.debug.memory, exit_code)
 
     # from exabgp.util.od import od
 
@@ -384,28 +573,41 @@ enhanced_route_refresh = False
 def main():
     parser = argparse.ArgumentParser("BGP injection")
     # parser.add_argument("-a", "--ascii", action="store_true", help="Output ASCII")
-    parser.add_argument(
-        "--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("-i", "--input", help="Raw data to send")
     parser.add_argument("-a", "--asn", default="100", help="BGP AS")
-    parser.add_argument("-l", "--local-ip", default="::", help="BGP Listen IP")
+    parser.add_argument(
+        "-l", "--local-ip", default="10.0.0.1", help="BGP Listen IP")
     parser.add_argument(
         "-r", "--router-id", default="10.0.0.1", help="BGP Router ID")
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("peers", help="EBGP peer (ip,as)")
     args = parser.parse_args()
+
+    if args.verbose:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+
+    logging.basicConfig(
+        format='%(asctime)s: %(levelname)s: %(message)s', level=logging.DEBUG)
 
     try:
         peerip, peerport, peeras = args.peers.split(",")
     except ValueError:
         peerport = 179
         peerip, peeras = args.peers.split(",")
+    peerip = ipaddress.ip_address(peerip)
     peerport = int(peerport)
     peeras = int(peeras)
+    routerid = ipaddress.ip_address(args.router_id)
+    localip = ipaddress.ip_address(args.local_ip)
+    localas = int(args.asn)
 
-    # ryu(args.router_id, int(args.asn), peerip, peerport, peeras)
-    # yabgp(args.router_id, int(args.asn), peerip, peerport, peeras)
-    exabgp(
-        ipaddress.ip_address(args.local_ip), args.router_id, int(args.asn),
-        peerip, peerport, peeras)
+    # ryu(args.router_id, localas, peerip, peerport, peeras)
+    # yabgp(args.router_id, localas, peerip, peerport, peeras)
+    # exabgp(localip, args.router_id, localas, peerip, peerport, peeras)
+    ours(localip, routerid, localas, peerip, peerport, peeras, args.input)
 
 
 if __name__ == "__main__":

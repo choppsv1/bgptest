@@ -21,27 +21,26 @@ version: "2.1"
 services:
 
   # AS 20 - inject 500k/s 2.5M total
-  ebgp:
-    # sysctls:
-    #   - net.ipv6.conf.all.disable_ipv6=1
-    #   - net.ipv6.conf.all.forwarding=1
-    #   - net.ipv6.conf.default.forwarding=1
-    # cap_add:
-    #   - NET_ADMIN
-    #   - SYS_ADMIN
-    image: bgptest
-    # command: bgpsim -f /bgptest/bgpsim.conf -v
-    # command: bash -c 'sbgp -a -v -o /bgptest/sbgp.out AS20 10.0.0.30 AS30'
-    # command: gobgpd -t yaml -f /bgptest/conf/gobgp6-ebgp.yml
-    command: bash -c 'mkdir -p /run/bird && bird6 -dc /bgptest/conf/bird6-ebgp.conf'
-    volumes:
-      - .:/bgptest
-    ports:
-      - 5674:5674
-    networks:
-      ebgpnet:
-        ipv4_address: 10.0.0.20
-        ipv6_address: fc00::20
+  # ebgp:
+  #   # sysctls:
+  #   #   - net.ipv6.conf.all.disable_ipv6=1
+  #   #   - net.ipv6.conf.all.forwarding=1
+  #   #   - net.ipv6.conf.default.forwarding=1
+  #   # cap_add:
+  #   #   - NET_ADMIN
+  #   #   - SYS_ADMIN
+  #   image: bgptest
+  #   # command: bgpsim -f /bgptest/bgpsim.conf -v
+  #   # command: bash -c 'sbgp -a -v -o /bgptest/sbgp.out AS20 10.0.0.30 AS30'
+  #   command: gobgpd -t yaml -f /bgptest/conf/gobgp6-ebgp.yml
+  #   volumes:
+  #     - .:/bgptest
+  #   ports:
+  #     - 5674:5674
+  #   networks:
+  #     ebgpnet:
+  #       ipv4_address: 10.0.0.20
+  #       ipv6_address: fc00::20
 
   # AS 30 - receive 500k/s 2.5M total
   bgput:
@@ -54,7 +53,7 @@ services:
     #   - SYS_ADMIN
     image: bgptest
     # command: gobgpd -t yaml -f /bgptest/conf/gobgp6-bgput.yml
-    command: bash -c 'mkdir -p /run/bird && bird6 -dc /bgptest/conf/bird6-bgput.conf'
+    command: bash -c 'mkdir -p /run/bird && bird -dc /bgptest/conf/bird-bgput.conf'
     volumes:
       - .:/bgptest
     networks:
@@ -76,7 +75,7 @@ services:
     image: bgptest
     # command: gobgpd -t yaml -f /bgptest/conf/gobgp6-ibgp.yml
     # command: sbgp -a -v -o /bgptest/sbgp-ibgp.out AS30 10.0.1.30 AS30
-    command: bash -c 'mkdir -p /run/bird && bird6 -dc /bgptest/conf/bird6-ibgp.conf'
+    command: bash -c 'mkdir -p /run/bird && bird -dc /bgptest/conf/bird-ibgp.conf'
     volumes:
       - .:/bgptest
     networks:

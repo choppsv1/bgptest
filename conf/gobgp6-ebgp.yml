@@ -13,14 +13,6 @@ global:
       #   - "policy2"
 neighbors:
   - config:
-      neighbor-address: 10.0.0.30
-      peer-as: 30
-    afi-safis:
-      - config:
-          afi-safi-name: ipv6-unicast
-      - config:
-          afi-safi-name: ipv4-unicast
-  - config:
       neighbor-address: fc00::30
       peer-as: 30
     afi-safis:
