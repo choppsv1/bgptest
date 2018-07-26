@@ -1,0 +1,8 @@
+.venv
+docker/go*.tar.gz
+.vagrant/
+data/
+-data/README.org
+tools/
+vagrant/mrtbin/
+venv

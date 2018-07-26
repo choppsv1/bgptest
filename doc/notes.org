@@ -1,0 +1,24 @@
+* Go BGP
+** Using GoBGP
+#+begin_src bash
+  # list neighbor
+  docker-compose exec bgput gobgp neighbor
+
+  # neighbor info
+  docker-compose exec bgput gobgp neighbor 10.0.0.20
+  docker-compose exec bgput gobgp neighbor 10.0.1.31
+
+  # Global RIB
+  gobgp global rib
+
+  # RIB-IN
+  gobgp neighbor 10.0.0.20 adj-in
+  gobgp neighbor 10.0.1.31 adj-in
+
+  # RIB-OUT
+  gobgp neighbor 10.0.0.20 adj-out
+  gobgp neighbor 10.0.1.31 adj-out
+#+end_src
+* FRR - BGPD
+
+* BIRD -
