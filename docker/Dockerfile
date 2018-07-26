@@ -30,3 +30,5 @@ RUN go get -u github.com/golang/dep/cmd/dep && \
     (cd /go/src/github.com/osrg/gobgp && /go/bin/dep ensure) && \
     (cd /go/src/github.com/osrg/gobgp/cmd/gobgp && go install) && \
     (cd /go/src/github.com/osrg/gobgp/cmd/gobgpd && go install)
+
+RUN mkdir /run/bird

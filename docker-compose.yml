@@ -1,44 +1,17 @@
 version: "2.1"
 
-# Must define these in the shell
-# global:
-#   environment:
-#       PFX4: 10.1
-#       PFX6: fc01:1
-#       IMAGES_DIR:  /var/tftp/images
-    # cap_add:
-    #   - NET_ADMIN
-    #   - SYS_ADMIN
-
-  # AS 20 - inject 500k/s 2.5M total - remote AS 30
-  # Single interface.
-  # - Wait for trigger that the BGP receiver [? chopps: has got them?]
-  # - Loop
-  #   - Send 250K DOWN from previous set
-  #   - Send 250K UP new prefixes (not sent previously).
-  #   - Wait for trigger that the BGP receiver [? chopps: has got them?]
+# AS 20 - inject 500k/s 2.5M total - remote AS 30
+# Single interface.
+# - Wait for trigger that the BGP receiver [? chopps: has got them?]
+# - Loop
+#   - Send 250K DOWN from previous set
+#   - Send 250K UP new prefixes (not sent previously).
+#   - Wait for trigger that the BGP receiver [? chopps: has got them?]
 
 services:
-  # AS 20 - inject 500k/s 2.5M total
-  # ft:
-  #   image: bgptest
-  #   # command: gobgpd -t yaml -f /bgptest/conf/gobgp6-ebgp.yml
-  #   # command: bash -c 'mkdir -p /run/bird && bird6 -dc /bgptest/conf/bird6-ebgp.conf'
-  #   volumes:
-  #     - .:/bgptest
-  #   networks:
-  #     ebgpnet:
-  #       # ipv4_address: 10.0.0.20
-  #       ipv6_address: fc00::20
-
-       # mkfifo //run/exabgp.{in,out};
-       # chmod 600 //run/exabgp.{in,out};
-
   st_1:
     image: bgptest
     environment:
-      INJECTSCRIPT: python3 /bgptest/exabgp-inject.py
-      LOCALIP: fc00::10
       LOCALAS: 10
       MAXROUTES: 2500000
       PEERIP: fc00::30
@@ -47,12 +20,10 @@ services:
     command:
       - bash
       - -c
-      -
-        envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
+      - envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
         gobgpd -t yaml -f /tmp/gobgp-conf.yml
     networks:
       ebgpnet:
-        # ipv4_address: 10.0.0.20
         ipv6_address: fc00::10
     volumes:
       - .:/bgptest
@@ -60,28 +31,48 @@ services:
   # AS 30 - receive 500k/s 2.5M total
   bgput:
     image: bgptest
-    # command: gobgpd -t yaml -f /bgptest/conf/gobgp6-bgput.yml
-    command: bash -c 'mkdir -p /run/bird && bird6 -dc /bgptest/conf/bird6-bgput.conf'
+    environment:
+      IPEERIP: fc00::31
+      LOCALAS: 30
+      PEER_FT_AS: 20
+      PEER_FT_IP: fc00::20
+      PEER_ST1_AS: 10
+      PEER_ST1_IP: fc00::10
+      PEER_ST2_AS: 11
+      PEER_ST2_IP: fc00::11
+      PEER_ST3_AS: 12
+      PEER_ST3_IP: fc00::12
+      PEER_TR_IP: fc01::31
+      ROUTERID: 10.0.0.30
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/bird6-bgput.tpl > /etc/bird6.conf;
+        bird6 -dc /etc/bird6.conf;
     volumes:
       - .:/bgptest
     networks:
       ebgpnet:
-        # ipv4_address: 10.0.0.30
         ipv6_address: fc00::30
       ibgpnet:
-        # ipv4_address: 10.0.1.30
         ipv6_address: fc01::30
   # AS 30 - receive 500k/s 2.5M total
   ibgp:
     image: bgptest
-    # command: gobgpd -t yaml -f /bgptest/conf/gobgp6-ibgp.yml
-    # command: sbgp -a -v -o /bgptest/sbgp-ibgp.out AS30 10.0.1.30 AS30
-    command: bash -c 'mkdir -p /run/bird && bird6 -dc /bgptest/conf/bird6-ibgp.conf'
+    environment:
+      LOCALAS: 30
+      PEER_UT_AS: 30
+      PEER_UT_IP: fc01::30
+      ROUTERID: 10.0.0.31
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/bird6-ibgp.tpl > /etc/bird6.conf;
+        bird6 -dc /etc/bird6.conf;
     volumes:
       - .:/bgptest
     networks:
       ibgpnet:
-        # ipv4_address: 10.0.1.31
         ipv6_address: fc01::31
 
 networks:
@@ -90,20 +81,10 @@ networks:
     enable_ipv6: true
     ipam:
       config:
-        # - subnet: 10.0.0.0/24
         - subnet: fc00::/64
   ibgpnet:
     driver: bridge
     enable_ipv6: true
     ipam:
       config:
-        # - subnet: 10.0.1.0/24
         - subnet: fc01::/64
-
-# sysctls:
-#   - net.ipv6.conf.all.disable_ipv6=1
-#   - net.ipv6.conf.all.forwarding=1
-#   - net.ipv6.conf.default.forwarding=1
-# cap_add:
-#   - NET_ADMIN
-#   - SYS_ADMIN
