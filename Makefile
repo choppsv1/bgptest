@@ -25,7 +25,8 @@ MRTFILES := $(patsubst %,data/%.mrt,$(SMRTFILES))
 
 all:
 
-clean data/*.raw data/*.mrt
+clean:
+	rm data/*.raw data/*.mrt
 
 mrt: $(MRTFILES)
 

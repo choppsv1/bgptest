@@ -411,9 +411,13 @@ def genroute(outfile, prefix, nexthop, aslist, seqno):
     if nexthop.version == 4:
         assert nhlen == 4
         attrs += bytes((BGPAF_TRANS, BGPAT_NEXTHOP, nhlen))
+        attrs += nexthop.packed
     else:
-        attrs += bytes((BGPAF_OPTIONAL, BGPAT_MP_REACH_NLRI, nhlen))
-    attrs += nexthop.packed
+        attrs += bytes((BGPAF_OPTIONAL, BGPAT_MP_REACH_NLRI, nhlen + 5,)) + \
+            struct.pack("!HBB", MPBGP_IPV6_AFI, MPBGP_UNICAST_SAFI, nhlen)
+        attrs += nexthop.packed
+        # 0 SNPA
+        attrs += b"\x00"
 
     routefile.write(struct.pack("!H", len(attrs)))
     routefile.write(attrs)

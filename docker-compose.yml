@@ -36,14 +36,6 @@ services:
 
   st_1:
     image: bgptest
-    command:
-      - bash
-      - -c
-      -
-        envsubst < /bgptest/conf/exabgp.tpl > /tmp/exabgp-10.conf;
-        exabgp --env /bgptest/conf/exabgp.env /tmp/exabgp-10.conf;
-    volumes:
-      - .:/bgptest
     environment:
       INJECTSCRIPT: python3 /bgptest/exabgp-inject.py
       LOCALIP: fc00::10
@@ -52,10 +44,18 @@ services:
       PEERIP: fc00::30
       PEERAS: 30
       ROUTERID: 10.0.0.10
+    command:
+      - bash
+      - -c
+      -
+        envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
+        gobgpd -t yaml -f /tmp/gobgp-conf.yml
     networks:
       ebgpnet:
         # ipv4_address: 10.0.0.20
         ipv6_address: fc00::10
+    volumes:
+      - .:/bgptest
 
   # AS 30 - receive 500k/s 2.5M total
   bgput:
