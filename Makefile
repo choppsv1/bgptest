@@ -25,6 +25,8 @@ MRTFILES := $(patsubst %,data/%.mrt,$(SMRTFILES))
 
 all:
 
+clean data/*.raw data/*.mrt
+
 mrt: $(MRTFILES)
 
 upd: $(OUPDFILES) $(MUPDFILES)
@@ -45,3 +47,7 @@ $(OUPDFILES): FORCE
 	bash -c 'T1=$@; T2=$${T1#data/}; T=$${T2%.raw}; ARGS=$${T#onepath-}; MPACK=$${ARGS#*-}; ./genrt.py -u $@ --aspath $(AS_ONEPATH) --max-pack $$MPACK $(STDARGS)'
 
 FORCE:
+
+setup:
+	test -d venv || (python3 -m venv venv; echo $$(pwd)/venv > .venv)
+	. venv/bin/activate && pip install -r requirements.txt
