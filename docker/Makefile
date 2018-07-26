@@ -1,4 +1,4 @@
 all: build
 
 build:
-	docker build -t bgptest .
+	docker build --pull -t bgptest .

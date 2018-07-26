@@ -134,15 +134,7 @@ def make_msg(typ, data):
     return marker + struct.pack("!HB", len(data) + 19, typ) + data
 
 
-def get_attrs(aslist, nexthop):
-    # ------
-    # Origin
-    # ------
-    attrs = BGP_ORIGIN_VALUE_IGP
-
-    # -------
-    # AS-PATH
-    # -------
+def get_aspath_attr(aslist):
     acount = len(aslist)
     # if as4:
     if True:  # pylint: disable=W0125
@@ -155,7 +147,20 @@ def get_attrs(aslist, nexthop):
                          BGPAT_ASPATH_ST_SEQ, acount)
     for asn in aslist:
         aspath += struct.pack(afmt, asn)
-    attrs += aspath
+
+    return aspath
+
+
+def get_attrs(aslist, nexthop):
+    # ------
+    # Origin
+    # ------
+    attrs = BGP_ORIGIN_VALUE_IGP
+
+    # -------
+    # AS-PATH
+    # -------
+    attrs += get_aspath_attr(aslist)
 
     if nexthop.version == 4:
         # --------
@@ -228,20 +233,28 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
 
     aslist = [int(x) for x in aspath if x]
     rootas = aslist[-1]
+
     attrs, mpattr, remain = get_update_header(aslist, nexthop)
     nlri = b""
     ucount = 0
     mcount = 0
     count = 0
+
     for rprefix in prefix.subnets(new_prefix=sublen):
         if (count % 10000) == 0:
             print("routes: {}".format(count), end='\r')
 
         p = packprefix(rprefix)
         plen = len(p)
+
         if plen > remain or mcount == maxpack:
             write_update(attrs, mpattr, nlri)
             ucount += 1
+            # Possibly update the AS PATH
+            if incroot:
+                aslist[-1] += 1
+                if modroot:
+                    aslist[-1] %= modroot
             attrs, mpattr, remain = get_update_header(aslist, nexthop)
             nlri = b""
             mcount = 0
@@ -250,11 +263,6 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
         remain -= plen
         count += 1
         mcount += 1
-
-        if incroot:
-            aslist[-1] += 1
-            if modroot:
-                aslist[-1] %= modroot
 
         if count == maxroute:
             break
@@ -380,7 +388,7 @@ def genpeers(outfile, peers):
 # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 
-def genroute(outfile, prefix, nexthop, seqno):
+def genroute(outfile, prefix, nexthop, aslist, seqno):
     #print("Adding {} via {} seqno {}".format(prefix, nexthop, seqno))
 
     routefile = io.BytesIO()
@@ -394,11 +402,17 @@ def genroute(outfile, prefix, nexthop, seqno):
 
     # Origin
     attrs = BGP_ORIGIN_VALUE_IGP
+
     # AS-PATH
-    attrs += BGP_ASPATH_VALUE_20
+    attrs += get_aspath_attr(aslist)
+
     # Next-Hop
-    attrs += bytes((BGPAF_TRANS, BGPAT_NEXTHOP, len(nexthop.packed)))
-    assert len(nexthop.packed) == 4
+    nhlen = len(nexthop.packed)
+    if nexthop.version == 4:
+        assert nhlen == 4
+        attrs += bytes((BGPAF_TRANS, BGPAT_NEXTHOP, nhlen))
+    else:
+        attrs += bytes((BGPAF_OPTIONAL, BGPAT_MP_REACH_NLRI, nhlen))
     attrs += nexthop.packed
 
     routefile.write(struct.pack("!H", len(attrs)))
@@ -408,18 +422,45 @@ def genroute(outfile, prefix, nexthop, seqno):
         subtype = TD_STYPE_RIB_IPV4_UNICAST
     else:
         subtype = TD_STYPE_RIB_IPV6_UNICAST
+
     mrtencode(outfile, MRT_TYPE_TABLE_DUMP_V2, subtype, routefile.getvalue())
 
 
-def genroutes(outfile, prefix, sublen, nexthop, seqno):
-    # print(prefix, sublen, seqno)
-    for rprefix in prefix.subnets(new_prefix=sublen):
+def genroutes(  # pylint: disable=R0913,R0914
+        outfile,  # pylint: disable=R0913,R0914
+        prefix,  # pylint: disable=R0913,R0914
+        sublen,  # pylint: disable=R0913,R0914
+        nexthop,  # pylint: disable=R0913,R0914
+        seqno,  # pylint: disable=R0913,R0914
+        maxpack,  # pylint: disable=R0913,R0914
+        maxroute,  # pylint: disable=R0913,R0914
+        aspath,  # pylint: disable=R0913,R0914
+        incroot,  # pylint: disable=R0913,R0914
+        modroot):  # pylint: disable=R0913,R0914
+
+    aslist = [int(x) for x in aspath if x]
+    rootas = aslist[-1]
+
+    for count, rprefix in enumerate(prefix.subnets(new_prefix=sublen)):
         if (seqno % 10000) == 0:
-            print("{}".format(seqno))
-        genroute(outfile, rprefix, nexthop, seqno)
+            print("routes: {}".format(count), end='\r')
+
+        genroute(outfile, rprefix, nexthop, aslist, seqno)
+
+        if incroot:
+            # Max Pack tells us when to increment we allow maxpack routes to have same AS
+            if maxpack < 2 or seqno % maxpack == 0:
+                aslist[-1] += 1
+                if modroot:
+                    aslist[-1] %= modroot
+
+        if count == maxroute:
+            break
+
         seqno += 1
         if seqno > 0xFFFFFFFF:
             seqno = 0
+
     return seqno
 
 
@@ -472,12 +513,13 @@ def main():
         "tuples", nargs="*", help="PREFIX SUBLEN NEXTHOP pairs")
     args = parser.parse_args()
 
+    aspath = args.aspath.split(",")
+    incroot = args.root_as_inc
+    modroot = args.root_as_mod
+    maxroute = args.max_routes
+    maxpack = args.max_pack
+
     if args.update:
-        aspath = args.aspath.split(",")
-        incroot = args.root_as_inc
-        modroot = args.root_as_mod
-        maxroute = args.max_routes
-        maxpack = args.max_pack
         if args.update == "-":
             assert args.tabledump != "-"
             outfile = sys.stdout.buffer
@@ -531,7 +573,8 @@ def main():
             prefix = ipaddress.ip_network(pfx)
             nexthop = ipaddress.ip_address(nexthop)
             assert prefix.version == nexthop.version
-            seqno = genroutes(outfile, prefix, int(sublen), nexthop, seqno)
+            seqno = genroutes(outfile, prefix, int(sublen), nexthop, seqno,
+                              maxpack, maxroute, aspath, incroot, modroot)
         print("{}".format(seqno))
 
 
