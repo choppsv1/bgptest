@@ -1,15 +1,29 @@
 router id ${ROUTERID};
 
-protocol device {}
-protocol kernel { metric 64; import none; export none; }
 # debug protocols all;
 
-protocol bgp bgp_${PEER_UT_AS} {
-  description "IBGP ${PEER_UT_IP} ${PEER_UT_AS}";
-  local as ${LOCALAS};
-  neighbor ${PEER_UT_IP} as ${PEER_UT_AS};
-  direct;
-  gateway direct;
-  import all;
-  # export all;
+filter loopbackfilter
+prefix set allnets;
+{
+    allnets = [ fd00::/8 ];
+    if (net ~ allnets) then accept;
+    reject;
+}
+
+protocol device {}
+
+protocol kernel {
+    metric 64;
+    import none;
+    export filter loopbackfilter;
+}
+
+protocol bgp bgp_${PEERAS} {
+    description "IBGP ${PEERIP} ${PEERAS}";
+    local as ${LOCALAS};
+    neighbor ${PEERIP} as ${PEERAS};
+    direct;
+    gateway direct;
+    import all;
+    export where proto = "loopback_bgp";
 }

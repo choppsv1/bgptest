@@ -9,41 +9,24 @@ version: "2.1"
 #   - Wait for trigger that the BGP receiver [? chopps: has got them?]
 
 services:
-  st_1:
-    image: bgptest
-    environment:
-      LOCALAS: 10
-      MAXROUTES: 2500000
-      PEERIP: fc00::30
-      PEERAS: 30
-      ROUTERID: 10.0.0.10
-    command:
-      - bash
-      - -c
-      - envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
-        gobgpd -t yaml -f /tmp/gobgp-conf.yml
-    networks:
-      ebgpnet:
-        ipv6_address: fc00::10
-    volumes:
-      - .:/bgptest
-
   # AS 30 - receive 500k/s 2.5M total
   bgput:
+    # Huawei
+    # image: gitlab.dev.terastrm.net:4567/terastream/vrnetlab/vr-vrp:V100R001C00SPC002
     image: bgptest
     environment:
-      IPEERIP: fc00::31
       LOCALAS: 30
+      PEER_TR_AS: 30
+      PEER_TR_IP: fc30::2
       PEER_FT_AS: 20
-      PEER_FT_IP: fc00::20
+      PEER_FT_IP: fc20::2
       PEER_ST1_AS: 10
-      PEER_ST1_IP: fc00::10
+      PEER_ST1_IP: fc10::2
       PEER_ST2_AS: 11
-      PEER_ST2_IP: fc00::11
+      PEER_ST2_IP: fc11::2
       PEER_ST3_AS: 12
-      PEER_ST3_IP: fc00::12
-      PEER_TR_IP: fc01::31
-      ROUTERID: 10.0.0.30
+      PEER_ST3_IP: fc12::2
+      ROUTERID: 192.168.30.1
     command:
       - bash
       - -c
@@ -53,17 +36,89 @@ services:
       - .:/bgptest
     networks:
       ebgpnet:
-        ipv6_address: fc00::30
+        ipv6_address: fc20::1
+      st1net:
+        ipv6_address: fc10::1
+      st2net:
+        ipv6_address: fc11::1
+      st3net:
+        ipv6_address: fc12::1
       ibgpnet:
-        ipv6_address: fc01::30
+        ipv6_address: fc30::1
+  st_1:
+    image: bgptest
+    environment:
+      LOCALAS: 10
+      MAXROUTES: 2500000
+      PEERIP: fc10::2
+      PEERAS: 30
+      ROUTERID: 192.168.10.2
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
+        gobgpd -t yaml -f /tmp/gobgp-conf.yml &;
+        sleep 5;
+        echo "Injecting Routes";
+        gobgp mrt inject global /bgptest/data/st-10.mrt;
+        gobgp monitor
+    networks:
+      st1net:
+        ipv6_address: fc10::2
+    volumes:
+      - .:/bgptest
+  st_2:
+    image: bgptest
+    environment:
+      LOCALAS: 11
+      MAXROUTES: 2500000
+      PEERIP: fc11::2
+      PEERAS: 30
+      ROUTERID: 192.168.11.2
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
+        gobgpd -t yaml -f /tmp/gobgp-conf.yml &;
+        sleep 5;
+        echo "Injecting Routes";
+        gobgp mrt inject global /bgptest/data/st-10.mrt;
+        gobgp monitor
+    networks:
+      st2net:
+        ipv6_address: fc11::2
+    volumes:
+      - .:/bgptest
+  st_3:
+    image: bgptest
+    environment:
+      LOCALAS: 12
+      MAXROUTES: 2500000
+      PEERIP: fc12::2
+      PEERAS: 30
+      ROUTERID: 192.168.12.2
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
+        gobgpd -t yaml -f /tmp/gobgp-conf.yml &;
+        sleep 5;
+        echo "Injecting Routes";
+        gobgp mrt inject global /bgptest/data/st-10.mrt;
+        gobgp monitor
+    networks:
+      st3net:
+        ipv6_address: fc12::2
+    volumes:
+      - .:/bgptest
   # AS 30 - receive 500k/s 2.5M total
   ibgp:
     image: bgptest
     environment:
       LOCALAS: 30
-      PEER_UT_AS: 30
-      PEER_UT_IP: fc01::30
-      ROUTERID: 10.0.0.31
+      PEERAS: 30
+      PEERIP: fc30::2
+      ROUTERID: 192.168.30.2
     command:
       - bash
       - -c
@@ -73,18 +128,41 @@ services:
       - .:/bgptest
     networks:
       ibgpnet:
-        ipv6_address: fc01::31
+        ipv6_address: fc30::31
 
 networks:
+  st1net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc10::/64
+          gateway: fc10::ffff
+  st2net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc11::/64
+          gateway: fc11::ffff
+  st3net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc12::/64
+          gateway: fc12::ffff
   ebgpnet:
     driver: bridge
     enable_ipv6: true
     ipam:
       config:
-        - subnet: fc00::/64
+        - subnet: fc20::/64
+          gateway: fc20::2
   ibgpnet:
     driver: bridge
     enable_ipv6: true
     ipam:
       config:
-        - subnet: fc01::/64
+        - subnet: fc30::/64
+          gateway: fc30::ffff

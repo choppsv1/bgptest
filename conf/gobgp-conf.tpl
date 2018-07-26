@@ -14,5 +14,5 @@ neighbors:
     afi-safis:
       - config:
           afi-safi-name: ipv6-unicast
-      - config:
-          afi-safi-name: ipv4-unicast
+      # - config:
+      #     afi-safi-name: ipv4-unicast

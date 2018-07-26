@@ -2,17 +2,32 @@
 # of your router, usually one of router's IPv4 addresses.
 router id ${ROUTERID};
 
-protocol device {}
-protocol kernel { metric 64; import none; export none; }
 # debug protocols all;
+
+filter loopbackfilter
+prefix set allnets;
+{
+    allnets = [ fd00::/8 ];
+    if (net ~ allnets) then accept;
+    reject;
+}
+
+protocol device {}
+
+protocol kernel {
+    metric 64;
+    import none;
+    export filter loopbackfilter;
+}
 
 protocol bgp ibgp {
   description "ibgp";
   local as ${LOCALAS};
-  neighbor ${PEER_TR_IP} as ${LOCALAS};
+  neighbor ${PEER_TR_IP} as ${PEER_TR_AS};
   direct;
   next hop self;
   import none;
+  export where proto = "loopback_bgp";
   export all;
 }
 
@@ -55,4 +70,8 @@ protocol bgp st_3 {
   next hop self;
   import all;
   export none;
+}
+
+protocol static loopback_bgp {
+  route fd${LOCALAS}::1/128 reject; # Loopback
 }

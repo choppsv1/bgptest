@@ -453,7 +453,7 @@ def genroutes(  # pylint: disable=R0913,R0914
 
         if incroot:
             # Max Pack tells us when to increment we allow maxpack routes to have same AS
-            if maxpack < 2 or seqno % maxpack == 0:
+            if maxpack < 2 or count % maxpack == 0:
                 aslist[-1] += 1
                 if modroot:
                     aslist[-1] %= modroot
