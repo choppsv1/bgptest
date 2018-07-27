@@ -43,8 +43,9 @@ RUN sed -i -e '/# deb http.* universe/s,^# ,,' /etc/apt/sources.list && \
 
 # ADD go1.10.3.linux-amd64.tar.gz /usr/local/
 ADD https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz /usr/local/
-
-RUN go get -u github.com/golang/dep/cmd/dep && \
+RUN tar -C /usr/local -xzf /usr/local/go1.10.3.linux-amd64.tar.gz && \
+    rm go1.10.3.linux-amd64.tar.gz && \
+    go get -u github.com/golang/dep/cmd/dep && \
     (go get github.com/osrg/gobgp || true) && \
     (cd /go/src/github.com/osrg/gobgp && /go/bin/dep ensure) && \
     (cd /go/src/github.com/osrg/gobgp/cmd/gobgp && go install) && \
