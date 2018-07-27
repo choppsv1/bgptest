@@ -39,12 +39,9 @@ RUN sed -i -e '/# deb http.* universe/s,^# ,,' /etc/apt/sources.list && \
     python3.6 -m pip install -U \
         coverage cryptography docker exabgp lxml netconf nose pylint pysnmp \
         pytest pyyaml ryu tox twine wheel && \
-        apt-get autoremove -y && apt-get clean -y
-
-# ADD go1.10.3.linux-amd64.tar.gz /usr/local/
-ADD https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz /usr/local/
-RUN tar -C /usr/local -xzf /usr/local/go1.10.3.linux-amd64.tar.gz && \
-    rm go1.10.3.linux-amd64.tar.gz && \
+        apt-get autoremove -y && apt-get clean -y && \
+    (curl -fL https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz | \
+     tar -C /usr/local -xzf -) && \
     go get -u github.com/golang/dep/cmd/dep && \
     (go get github.com/osrg/gobgp || true) && \
     (cd /go/src/github.com/osrg/gobgp && /go/bin/dep ensure) && \
