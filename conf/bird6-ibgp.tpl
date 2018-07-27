@@ -2,20 +2,30 @@ router id ${ROUTERID};
 
 # debug protocols all;
 
-filter loopbackfilter
-prefix set allnets;
-{
-    allnets = [ fd00::/8 ];
-    if (net ~ allnets) then accept;
-    reject;
+protocol device {}
+
+protocol direct {
+    interface "*";
+    import all;
+    export all;
 }
 
-protocol device {}
+filter loopbackfilter
+{
+    if (net ~ fd00::/8) then accept;
+    else reject;
+}
 
 protocol kernel {
     metric 64;
-    import none;
+    # import none;
     export filter loopbackfilter;
+    import filter loopbackfilter;
+}
+
+protocol static loopback_bgp {
+  import all; # originate here (?).
+  route fd${LOCALAS}::1/128 via "lo";
 }
 
 protocol bgp bgp_${PEERAS} {
@@ -25,5 +35,8 @@ protocol bgp bgp_${PEERAS} {
     direct;
     gateway direct;
     import all;
-    export where proto = "loopback_bgp";
+    export filter loopbackfilter;
+  # export where proto = "loopback_bgp";
 }
+
+# WARNCPU
