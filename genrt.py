@@ -6,9 +6,16 @@
 import argparse
 import io
 import ipaddress
+import logging
 import time
 import struct
 import sys
+
+
+log = logging.getLogger()
+
+# 19 bits is 500k (524288) 2008:0000/32 - 200F:FFFF/32
+
 
 # MRT Types
 MRT_TYPE_TABLE_DUMP_V2 = 13
@@ -242,7 +249,7 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
 
     for rprefix in prefix.subnets(new_prefix=sublen):
         if (count % 10000) == 0:
-            print("routes: {}".format(count), end='\r')
+            log.info("routes: {}".format(count), end='\r')
 
         p = packprefix(rprefix)
         plen = len(p)
@@ -431,7 +438,9 @@ def genroute(outfile, prefix, nexthop, aslist, seqno):
 
 
 def genroutes(  # pylint: disable=R0913,R0914
-        outfile,  # pylint: disable=R0913,R0914
+        tablefile,  # pylint: disable=R0913,R0914
+        fmtfile,  # pylint: disable=R0913,R0914
+        fmt, # pylint: disable=R0913,R0914
         prefix,  # pylint: disable=R0913,R0914
         sublen,  # pylint: disable=R0913,R0914
         nexthop,  # pylint: disable=R0913,R0914
@@ -447,9 +456,13 @@ def genroutes(  # pylint: disable=R0913,R0914
 
     for count, rprefix in enumerate(prefix.subnets(new_prefix=sublen)):
         if (seqno % 10000) == 0:
-            print("routes: {}".format(count), end='\r')
+            print("routes: {}".format(count), file=sys.stderr, end='\r')
 
-        genroute(outfile, rprefix, nexthop, aslist, seqno)
+        if tablefile:
+            genroute(tablefile, rprefix, nexthop, aslist, seqno)
+
+        if fmtfile:
+            fmtfile.write(fmt.format(prefix=rprefix, nexthop=nexthop) + "\n")
 
         if incroot:
             # Max Pack tells us when to increment we allow maxpack routes to have same AS
@@ -465,6 +478,7 @@ def genroutes(  # pylint: disable=R0913,R0914
         if seqno > 0xFFFFFFFF:
             seqno = 0
 
+    print("\n", file=sys.stderr)
     return seqno
 
 
@@ -486,14 +500,11 @@ def main():
     parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
-        "--root-as-inc", action="store_true", help="increment the root as")
-    parser.add_argument(
-        "--root-as-mod",
-        type=int,
-        default=0,
-        help="modulus the incrementing root as")
+        "--dump-format", default="    {prefix} via {nexthop};", help="Format to use for format dumped")
     parser.add_argument(
         "--aspath", default="20", help="comma sep list of asnumbers")
+    parser.add_argument(
+        "-f", "--format-file", help="File to write For table dump into")
     parser.add_argument(
         "-m",
         "--max-routes",
@@ -510,6 +521,13 @@ def main():
         "--peers",
         help="Space sep list of peers in form peerid,peerip,peeras")
     parser.add_argument(
+        "--root-as-inc", action="store_true", help="increment the root as")
+    parser.add_argument(
+        "--root-as-mod",
+        type=int,
+        default=0,
+        help="modulus the incrementing root as")
+    parser.add_argument(
         "-t", "--tabledump", help="File to write MRT table dump into")
     parser.add_argument(
         "-u", "--update", help="File to write BGP updates into")
@@ -517,15 +535,21 @@ def main():
         "tuples", nargs="*", help="PREFIX SUBLEN NEXTHOP pairs")
     args = parser.parse_args()
 
+    logging.basicConfig()
+
     aspath = args.aspath.split(",")
     incroot = args.root_as_inc
     modroot = args.root_as_mod
     maxroute = args.max_routes
     maxpack = args.max_pack
 
+    if len(args.tuples) % 3:
+        log.error("Prefix sublen args must come in triples\n")
+        sys.exit(1)
+
     if args.update:
         if args.update == "-":
-            assert args.tabledump != "-"
+            assert args.tabledump != "-" and args.format_file != "-"
             outfile = sys.stdout.buffer
         else:
             outfile = open(args.update, "wb")
@@ -543,30 +567,37 @@ def main():
             maxroute -= count
             if maxroute <= 0:
                 break
-        print("Wrote {} BGP updates with {} total NLRI".format(
+        log.info("Wrote {} BGP updates with {} total NLRI".format(
             updatecount, routecount))
 
-    if args.tabledump:
+    if args.tabledump or args.format_file:
+        tablefile = None
         if args.tabledump == "-":
-            assert args.upddate != "-"
-            outfile = sys.stdout.buffer
-        else:
-            outfile = open(args.tabledump, "wb")
+            assert args.update != "-" and args.format_file != "-"
+            tablefile = sys.stdout.buffer
+        elif args.tabledump:
+            tablefile = open(args.tabledump, "wb")
+
+        fmtfile = None
+        if args.format_file == "-":
+            assert args.update != "-" and args.tabledump != "-"
+            fmtfile = sys.stdout
+        elif args.format_file:
+            fmtfile = open(args.format_file, "w")
+
+
         # -------------------------
         # Generate Peer Index Table
         # -------------------------
 
-        peerlist = [X.split(",") for X in args.peers.split()]
-        peers = [(ipaddress.ip_address(x), ipaddress.ip_address(y), int(z))
-                 for x, y, z in peerlist]
-        peerfile = io.BytesIO()
-        genpeers(peerfile, peers)
-        mrtencode(outfile, MRT_TYPE_TABLE_DUMP_V2, TD_STYPE_PEER_INDEX_TABLE,
-                  peerfile.getvalue())
-
-        if len(args.tuples) % 3:
-            # print("Prefix sublen args must come in pairs\n")
-            sys.exit(1)
+        if tablefile:
+          peerlist = [X.split(",") for X in args.peers.split()]
+          peers = [(ipaddress.ip_address(x), ipaddress.ip_address(y), int(z))
+                  for x, y, z in peerlist]
+          peerfile = io.BytesIO()
+          genpeers(peerfile, peers)
+          mrtencode(outfile, MRT_TYPE_TABLE_DUMP_V2, TD_STYPE_PEER_INDEX_TABLE,
+                    peerfile.getvalue())
 
         # ---------------
         # Generate Routes
@@ -577,9 +608,9 @@ def main():
             prefix = ipaddress.ip_network(pfx)
             nexthop = ipaddress.ip_address(nexthop)
             assert prefix.version == nexthop.version
-            seqno = genroutes(outfile, prefix, int(sublen), nexthop, seqno,
+            seqno = genroutes(tablefile, fmtfile, args.dump_format, prefix, int(sublen), nexthop, seqno,
                               maxpack, maxroute, aspath, incroot, modroot)
-        print("{}".format(seqno))
+        log.info("Total routes: {}".format(seqno))
 
 
 if __name__ == "__main__":

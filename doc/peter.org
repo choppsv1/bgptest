@@ -1,3 +1,30 @@
+
+* Notes:
+
+       500K /32
+        1M   /48
+       500K /40
+       500K /64
+
+| cnt/type     | FT                       | ST-1           | ST-2           | ST-3           |
+|--------------+--------------------------+----------------+----------------+----------------|
+| 500k/32      | 2000::/32                | 2100::/32      | 2200::/32      | 2300::/32      |
+| (/13 covers) | 2007:FFFF::/32           | 2107:FFFF::/32 | 2207:FFFF::/32 | 2307:FFFF::/32 |
+| 2x08-2x0F..  |                          |                |                |                |
+|              |                          |                |                |                |
+| 500k/40      | 2010::/40                | 2110::/40      | 2210::/40      | 2310::/40      |
+| (/21 covers) | 2010::07FF:FF00::/40     |                |                |                |
+|              |                          |                |                |                |
+| 1M/48        | 2020::/48                | 2120::/48      | 2220::/48      | 2320::/48      |
+| (/28 covers) | 2020::000F:FFFF::/48     |                |                |                |
+|              |                          |                |                |                |
+| 500k/64      | 2030::/64                | 2130::/64      | 2230::/64      | 2330::/64      |
+| (/45 covers) | 2030:0000:0007:FFFF::/64 |                |                |                |
+
+
+
+* Email
+
 It does not need to process messages, it can replay pre-computed messages.
 
 So I was thinking a BGP message TCP speaker that read and writes from
@@ -6,6 +33,8 @@ a file or file in memory if disk is to slow.
 target is, send and receive 1M prefixes / second.
 
 --------------------------------------------------------------------
+
+* Original Email
 
 I need help, I need a program that can send/recive BGP updates for testing
 of routers at a rate of some 500K messgaes/sec.
