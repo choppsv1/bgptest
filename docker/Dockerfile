@@ -5,7 +5,7 @@ MAINTAINER Christian Hopps <chopps@gmail.com>
 ENV GOPATH=/go \
     GOROOT=/usr/local/go \
     LANG=en_US.UTF-8 \
-    LC_CTYPE=en_US.UTF-8
+    LC_CTYPE=en_US.UTF-8 \
     PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN sed -i -e '/# deb http.* universe/s,^# ,,' /etc/apt/sources.list && \
