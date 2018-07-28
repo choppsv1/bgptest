@@ -132,49 +132,58 @@
 
 Shell cmd to query IBGP:
 
-   while sleep 1; do \
-     printf "%s: " "$(date)"; \
-     docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
-     done
+#+begin_src bash
 
-[ output when using ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30 ]
+  while sleep 1; do \
+    printf "%s: " "$(date)"; \
+    docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
+    done
+#+end_src
 
-[ simulation startup ]
-Sat Jul 28 11:32:08 EDT 2018:   Routes:         0 imported, 0 exported, 0 preferred
-Sat Jul 28 11:32:09 EDT 2018:   Routes:         6 imported, 1 exported, 4 preferred
-Sat Jul 28 11:32:11 EDT 2018:   Routes:         788361 imported, 1 exported, 788359 preferred
-Sat Jul 28 11:32:13 EDT 2018:   Routes:         1992842 imported, 1 exported, 1992840 preferred
-Sat Jul 28 11:32:15 EDT 2018:   Routes:         3092105 imported, 1 exported, 3092103 preferred
-Sat Jul 28 11:32:17 EDT 2018:   Routes:         4286332 imported, 1 exported, 4286330 preferred
-Sat Jul 28 11:32:18 EDT 2018:   Routes:         5515840 imported, 1 exported, 5515838 preferred
-Sat Jul 28 11:32:20 EDT 2018:   Routes:         6746259 imported, 1 exported, 6746257 preferred
-Sat Jul 28 11:32:21 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
-Sat Jul 28 11:32:23 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
-Sat Jul 28 11:32:24 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
-Sat Jul 28 11:32:26 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
-Sat Jul 28 11:32:27 EDT 2018:   Routes:         7935026 imported, 1 exported, 7935024 preferred
-[ Started ./bgp-inject.py ]
-Sat Jul 28 11:32:29 EDT 2018:   Routes:         8358526 imported, 1 exported, 8358524 preferred
-Sat Jul 28 11:32:30 EDT 2018:   Routes:         8650214 imported, 1 exported, 8650212 preferred
-Sat Jul 28 11:32:32 EDT 2018:   Routes:         8910014 imported, 1 exported, 8910012 preferred
-Sat Jul 28 11:32:33 EDT 2018:   Routes:         9133502 imported, 1 exported, 9133500 preferred
-Sat Jul 28 11:32:35 EDT 2018:   Routes:         9335502 imported, 1 exported, 9335500 preferred
-Sat Jul 28 11:32:36 EDT 2018:   Routes:         9534002 imported, 1 exported, 9534000 preferred
-Sat Jul 28 11:32:38 EDT 2018:   Routes:         9726502 imported, 1 exported, 9726500 preferred
-Sat Jul 28 11:32:39 EDT 2018:   Routes:         9921002 imported, 1 exported, 9921000 preferred
-Sat Jul 28 11:32:41 EDT 2018:   Routes:         10129078 imported, 1 exported, 10129076 preferred
-Sat Jul 28 11:32:42 EDT 2018:   Routes:         10363078 imported, 1 exported, 10363076 preferred
-Sat Jul 28 11:32:44 EDT 2018:   Routes:         10485766 imported, 1 exported, 10485764 preferred
-Sat Jul 28 11:32:45 EDT 2018:   Routes:         10485766 imported, 1 exported, 10485764 preferred
-Sat Jul 28 11:32:47 EDT 2018:   Routes:         10485766 imported, 1 exported, 10485764 preferred
+Output when using ~./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30~
+
+#+begin_src bash
+
+  [ simulation startup ]
+  Sat Jul 28 11:32:08 EDT 2018:   Routes:         0 imported, 0 exported, 0 preferred
+  Sat Jul 28 11:32:09 EDT 2018:   Routes:         6 imported, 1 exported, 4 preferred
+  Sat Jul 28 11:32:11 EDT 2018:   Routes:         788361 imported, 1 exported, 788359 preferred
+  Sat Jul 28 11:32:13 EDT 2018:   Routes:         1992842 imported, 1 exported, 1992840 preferred
+  Sat Jul 28 11:32:15 EDT 2018:   Routes:         3092105 imported, 1 exported, 3092103 preferred
+  Sat Jul 28 11:32:17 EDT 2018:   Routes:         4286332 imported, 1 exported, 4286330 preferred
+  Sat Jul 28 11:32:18 EDT 2018:   Routes:         5515840 imported, 1 exported, 5515838 preferred
+  Sat Jul 28 11:32:20 EDT 2018:   Routes:         6746259 imported, 1 exported, 6746257 preferred
+  Sat Jul 28 11:32:21 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
+  Sat Jul 28 11:32:23 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
+  Sat Jul 28 11:32:24 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
+  Sat Jul 28 11:32:26 EDT 2018:   Routes:         7864326 imported, 1 exported, 7864324 preferred
+  Sat Jul 28 11:32:27 EDT 2018:   Routes:         7935026 imported, 1 exported, 7935024 preferred
+  [ Started ./bgp-inject.py ]
+  Sat Jul 28 11:32:29 EDT 2018:   Routes:         8358526 imported, 1 exported, 8358524 preferred
+  Sat Jul 28 11:32:30 EDT 2018:   Routes:         8650214 imported, 1 exported, 8650212 preferred
+  Sat Jul 28 11:32:32 EDT 2018:   Routes:         8910014 imported, 1 exported, 8910012 preferred
+  Sat Jul 28 11:32:33 EDT 2018:   Routes:         9133502 imported, 1 exported, 9133500 preferred
+  Sat Jul 28 11:32:35 EDT 2018:   Routes:         9335502 imported, 1 exported, 9335500 preferred
+  Sat Jul 28 11:32:36 EDT 2018:   Routes:         9534002 imported, 1 exported, 9534000 preferred
+  Sat Jul 28 11:32:38 EDT 2018:   Routes:         9726502 imported, 1 exported, 9726500 preferred
+  Sat Jul 28 11:32:39 EDT 2018:   Routes:         9921002 imported, 1 exported, 9921000 preferred
+  Sat Jul 28 11:32:41 EDT 2018:   Routes:         10129078 imported, 1 exported, 10129076 preferred
+  Sat Jul 28 11:32:42 EDT 2018:   Routes:         10363078 imported, 1 exported, 10363076 preferred
+  Sat Jul 28 11:32:44 EDT 2018:   Routes:         10485766 imported, 1 exported, 10485764 preferred
+  Sat Jul 28 11:32:45 EDT 2018:   Routes:         10485766 imported, 1 exported, 10485764 preferred
+  Sat Jul 28 11:32:47 EDT 2018:   Routes:         10485766 imported, 1 exported, 10485764 preferred
+
+#+end_src
 
 Output from ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
-[...]
-2018-07-28 11:32:27,860: INFO: ESTABLISHED (IPv6Address('fc20::1'), 179) (assuming 4-octet AS numbers)
-2018-07-28 11:32:27,860: INFO: Loading raw data from data/mpath-1000-100.raw
-2018-07-28 11:32:27,877: INFO: Sending 19529767 bytes of raw data to (IPv6Address('fc20::1'), 179)
-2018-07-28 11:32:42,215: INFO: Done sending after 14.355535507202148 to (IPv6Address('fc20::1'), 179)
+#+begin_src bash
 
+  [...]
+  2018-07-28 11:32:27,860: INFO: ESTABLISHED (IPv6Address('fc20::1'), 179) (assuming 4-octet AS numbers)
+  2018-07-28 11:32:27,860: INFO: Loading raw data from data/mpath-1000-100.raw
+  2018-07-28 11:32:27,877: INFO: Sending 19529767 bytes of raw data to (IPv6Address('fc20::1'), 179)
+  2018-07-28 11:32:42,215: INFO: Done sending after 14.355535507202148 to (IPv6Address('fc20::1'), 179)
+#+end_src
 
 *** FT+BGPUT only: 2.5M routes, 1000 paths 100 prefix per update.
 
@@ -182,20 +191,24 @@ Output from ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
     redistribution, it takes about 3 seconds to send the 2.5M prefix this is
     above 500k (app 853k updates/s)
 
-Sat Jul 28 12:09:29 EDT 2018:   Routes:         0 imported, 0 exported, 0 preferred
-Sat Jul 28 12:09:30 EDT 2018:   Routes:         923288 imported, 0 exported, 923288 preferred
-Sat Jul 28 12:09:32 EDT 2018:   Routes:         2171152 imported, 0 exported, 2171152 preferred
-Sat Jul 28 12:09:34 EDT 2018:   Routes:         2621440 imported, 0 exported, 2621440 preferred
+#+begin_src bash
 
-(default) 06:00 [12:08:23 tops:~/w/bgptest]$ ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
-2018-07-28 12:09:31,033: INFO: CONNECT (IPv6Address('fc20::1'), 179)
-2018-07-28 12:09:31,034: INFO: SENT OPEN (IPv6Address('fc20::1'), 179)
-2018-07-28 12:09:31,034: INFO: OPENCONFRIM (IPv6Address('fc20::1'), 179)
-2018-07-28 12:09:31,034: INFO: ESTABLISHED (IPv6Address('fc20::1'), 179) (assuming 4-octet AS numbers)
-2018-07-28 12:09:31,034: INFO: Loading raw data from data/mpath-1000-100.raw
-2018-07-28 12:09:31,052: INFO: Sending 19529767 bytes of raw data to (IPv6Address('fc20::1'), 179)
-2018-07-28 12:09:34,119: INFO: Done sending after 3.085615873336792 to (IPv6Address('fc20::1'), 179)
-2018-07-28 12:09:34,120: INFO: Sent KeepAlive to (IPv6Address('fc20::1'), 179) sleeping 30s
+  Sat Jul 28 12:09:29 EDT 2018:   Routes:         0 imported, 0 exported, 0 preferred
+  Sat Jul 28 12:09:30 EDT 2018:   Routes:         923288 imported, 0 exported, 923288 preferred
+  Sat Jul 28 12:09:32 EDT 2018:   Routes:         2171152 imported, 0 exported, 2171152 preferred
+  Sat Jul 28 12:09:34 EDT 2018:   Routes:         2621440 imported, 0 exported, 2621440 preferred
+
+  (default) 06:00 [12:08:23 tops:~/w/bgptest]$ ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
+  2018-07-28 12:09:31,033: INFO: CONNECT (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:09:31,034: INFO: SENT OPEN (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:09:31,034: INFO: OPENCONFRIM (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:09:31,034: INFO: ESTABLISHED (IPv6Address('fc20::1'), 179) (assuming 4-octet AS numbers)
+  2018-07-28 12:09:31,034: INFO: Loading raw data from data/mpath-1000-100.raw
+  2018-07-28 12:09:31,052: INFO: Sending 19529767 bytes of raw data to (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:09:34,119: INFO: Done sending after 3.085615873336792 to (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:09:34,120: INFO: Sent KeepAlive to (IPv6Address('fc20::1'), 179) sleeping 30s
+
+#+end_src
 
 *** FT+BGPUT only: 2.5M routes, all unique paths 1 prefix per update.
 
@@ -203,23 +216,26 @@ Sat Jul 28 12:09:34 EDT 2018:   Routes:         2621440 imported, 0 exported, 26
     (the most stressful and a somewhat unrealistic test) the time jumps to ~8s
     slightly (~300k updates/s)
 
-Sat Jul 28 12:13:56 EDT 2018:   Routes:         0 imported, 0 exported, 0 preferred
-Sat Jul 28 12:13:58 EDT 2018:   Routes:         416730 imported, 0 exported, 416730 preferred
-Sat Jul 28 12:14:00 EDT 2018:   Routes:         1271654 imported, 0 exported, 1271654 preferred
-Sat Jul 28 12:14:01 EDT 2018:   Routes:         1829414 imported, 0 exported, 1829414 preferred
-Sat Jul 28 12:14:03 EDT 2018:   Routes:         2196810 imported, 0 exported, 2196810 preferred
-Sat Jul 28 12:14:05 EDT 2018:   Routes:         2561020 imported, 0 exported, 2561020 preferred
-Sat Jul 28 12:14:07 EDT 2018:   Routes:         2621440 imported, 0 exported, 2621440 preferred
-S
-(default) 00:01 [12:13:09 tops:~/w/bgptest]$ ./bgp-inject.py -i data/mpath-0-1.raw fc20::1,30
-2018-07-28 12:13:58,370: INFO: CONNECT (IPv6Address('fc20::1'), 179)
-2018-07-28 12:13:58,370: INFO: SENT OPEN (IPv6Address('fc20::1'), 179)
-2018-07-28 12:13:58,370: INFO: OPENCONFRIM (IPv6Address('fc20::1'), 179)
-2018-07-28 12:13:58,370: INFO: ESTABLISHED (IPv6Address('fc20::1'), 179) (assuming 4-octet AS numbers)
-2018-07-28 12:13:58,370: INFO: Loading raw data from data/mpath-0-1.raw
-2018-07-28 12:13:58,526: INFO: Sending 188219392 bytes of raw data to (IPv6Address('fc20::1'), 179)
-2018-07-28 12:14:06,354: INFO: Done sending after 7.983449935913086 to (IPv6Address('fc20::1'), 179)
-2018-07-28 12:14:06,354: INFO: Sent KeepAlive to (IPv6Address('fc20::1'), 179) sleeping 30s
+#+begin_src bash
+
+  Sat Jul 28 12:13:56 EDT 2018:   Routes:         0 imported, 0 exported, 0 preferred
+  Sat Jul 28 12:13:58 EDT 2018:   Routes:         416730 imported, 0 exported, 416730 preferred
+  Sat Jul 28 12:14:00 EDT 2018:   Routes:         1271654 imported, 0 exported, 1271654 preferred
+  Sat Jul 28 12:14:01 EDT 2018:   Routes:         1829414 imported, 0 exported, 1829414 preferred
+  Sat Jul 28 12:14:03 EDT 2018:   Routes:         2196810 imported, 0 exported, 2196810 preferred
+  Sat Jul 28 12:14:05 EDT 2018:   Routes:         2561020 imported, 0 exported, 2561020 preferred
+  Sat Jul 28 12:14:07 EDT 2018:   Routes:         2621440 imported, 0 exported, 2621440 preferred
+
+  (default) 00:01 [12:13:09 tops:~/w/bgptest]$ ./bgp-inject.py -i data/mpath-0-1.raw fc20::1,30
+  2018-07-28 12:13:58,370: INFO: CONNECT (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:13:58,370: INFO: SENT OPEN (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:13:58,370: INFO: OPENCONFRIM (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:13:58,370: INFO: ESTABLISHED (IPv6Address('fc20::1'), 179) (assuming 4-octet AS numbers)
+  2018-07-28 12:13:58,370: INFO: Loading raw data from data/mpath-0-1.raw
+  2018-07-28 12:13:58,526: INFO: Sending 188219392 bytes of raw data to (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:14:06,354: INFO: Done sending after 7.983449935913086 to (IPv6Address('fc20::1'), 179)
+  2018-07-28 12:14:06,354: INFO: Sent KeepAlive to (IPv6Address('fc20::1'), 179) sleeping 30s
+#+end_src
 
 ** Not used to slow
 *** Go BGP
