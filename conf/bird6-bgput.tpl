@@ -38,14 +38,11 @@ protocol bgp ibgp {
   direct;
   next hop self;
   import none;
-  # export where proto = "loopback_bgp";
   export all;
 }
 
-protocol bgp ft {
-  description "FT";
-  passive on;
-  neighbor ${PEER_FT_IP} as ${PEER_FT_AS};
+template bgp ebgp {
+  description "ST 1";
   local as ${LOCALAS};
   direct;
   next hop self;
@@ -53,32 +50,23 @@ protocol bgp ft {
   export none;
 }
 
-protocol bgp st_1 {
+protocol bgp ft from ebgp {
+  description "FT";
+  neighbor ${PEER_FT_IP} as ${PEER_FT_AS};
+  passive on;
+}
+
+protocol bgp st_1 from ebgp {
   description "ST 1";
   neighbor ${PEER_ST1_IP} as ${PEER_ST1_AS};
-  local as ${LOCALAS};
-  direct;
-  next hop self;
-  import all;
-  export none;
 }
 
-protocol bgp st_2 {
+protocol bgp st_2 from ebgp {
   description "ST 2";
   neighbor ${PEER_ST2_IP} as ${PEER_ST2_AS};
-  local as ${LOCALAS};
-  direct;
-  next hop self;
-  import all;
-  export none;
 }
 
-protocol bgp st_3 {
+protocol bgp st_3 from ebgp {
   description "ST 3";
   neighbor ${PEER_ST3_IP} as ${PEER_ST3_AS};
-  local as ${LOCALAS};
-  direct;
-  next hop self;
-  import all;
-  export none;
 }

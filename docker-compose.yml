@@ -32,7 +32,6 @@ services:
       - -c
       - envsubst < /bgptest/conf/bird6-bgput.tpl > /etc/bird6.conf;
         bird6 -dc /etc/bird6.conf;
-      # ip -6 addr add fd$${LOCALAS}::1 dev lo;
     volumes:
       - .:/bgptest
     networks:
@@ -82,7 +81,6 @@ services:
       - NET_ADMIN
     sysctls:
       - net.ipv6.conf.all.forwarding=1
-
   st_2:
     image: choppsv1/bgptest
     environment:

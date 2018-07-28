@@ -261,7 +261,7 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
             if incroot:
                 aslist[-1] += 1
                 if modroot:
-                    aslist[-1] %= modroot
+                    aslist[-1] = rootas + (rootas - aslist[-1]) % modroot
             attrs, mpattr, remain = get_update_header(aslist, nexthop)
             nlri = b""
             mcount = 0
@@ -471,7 +471,7 @@ def genroutes(  # pylint: disable=R0913,R0914
             if maxpack < 2 or count % maxpack == 0:
                 aslist[-1] += 1
                 if modroot:
-                    aslist[-1] %= modroot
+                    aslist[-1] = rootas + (rootas - aslist[-1]) % modroot
 
         if count == maxroute:
             break
