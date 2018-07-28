@@ -1,0 +1,138 @@
+* BGPTEST
+
+  This is a set of tools and a simulation to stress test a BGP implmentation. 2
+  tools are used to test ~genrt.py~ and ~bgp-inject.py~. Also included is a
+  simulation setup that runs the test using docker to simulate 5 BGP routers.
+
+** Running Requirements
+*** Requirements for using tools:
+    - Ubuntu 18 with some packages installed.
+      - sudo apt-get update -qy
+      - sudo apt-get install bash python3 python3-dev python3-venv
+*** Requirements for simulation
+    - Additionally add latest docker package.
+      - curl -fsSL get.docker.com | sh
+      - sudo usermod -aG docker $(whoami)
+      - logout and back in so you are part of the unix group.
+
+** Description of Tools
+*** ~genrt.py~
+    Generates routes in various formats. It can create raw BGP Update messages to
+    inject directly into a BGP connection (using bgp-inject.py). It can also
+    create a list of static route definitions that can be included in BIRD (or
+    other) routing configs. Finally it can create MRT table dumps of routes that
+    can be used with gobgp to inject routes. MRT table dumps are also used by
+    RIPE and others to record BGP sessions and routing tables.
+
+*** ~bgp-inject.py~
+    ~bgp-inject.py~ Opens an EBGP connection and then sends the contents of file
+    over the connection. The file content (BGP update messages) can be created by
+    the ~genrt.py~ tool. Finally it enters a Keep Alive loop to keep the BGP
+    connection established.
+
+** Running the simulation.
+   To generate all the required configs and bringup the simulation one can
+   simply
+
+    : make run
+
+   All the configs and update messages files and 4 routers are created:
+
+    - ~bgput~ - The BGP under test everything connects to this router (AS30).
+    - ~st-1~ - BGP Static 1 - 2.5M routes (AS10)
+    - ~st-2~ - BGP Static 2 - 2.5M routes (AS11)
+    - ~st-3~ - BGP Static 3 - 2.5M routes (AS12)
+    - ~ibgp~ - IBGP speaker to check for presence of routes from ~bgput~
+
+   One can use the birdc6 CLI tool to examine state of the routers. For example
+   to look at the protocol stats (including route counts) you could use the
+   following command
+
+   : docker-compose exec ibgp birdc6 show proto all
+
+   Or to just look at the BGP speaker on IBGP
+
+   : docker-compose exec ibgp birdc6 show proto all bgp_30
+
+   The fifth router (~FT~) is you, running the bgp-inject.py tool directly from
+   the shell. This would be similar to testing a real router setup.
+
+   To bring down the simualtion use ~make stop~.
+
+** Running the test.
+   These instructions assume the simulation has been launched with ~make run~
+   from above. In a physical router setup the connectivity would need to be in
+   place and the addresses adjusted accordingly (if needed).
+
+   After the update messages raw file has been generated and the routers (or
+   simulation) brought up you are ready to inject the routes over EBGP this can
+   be done with the following command
+
+   : ./bgp-inject.py -i data/mpath-0-1000.raw fc20::1,30
+
+   This creates an EBGP speaker ~AS 20~ router ID ~10.0.0.20~, connecting
+   to ~fc20::1~ remote ~AS 30~. Once connection is ~ESTABLISHED~ the tool will
+   send the content of the file (~data/mpath-0-1000.raw~ in this case) to the
+   remote speaker.
+
+   We generate a few variants of 2.5M route updates. Here's the format:
+
+   : <type>-<mod>-<pack>
+
+   The ~type~ is either
+
+   - onepath - uses the same set of AS path for all routes
+   - mpath - the first AS in the path is incremented for each update message.
+
+   The ~mod~ is a modulus applied to the incremented AS number. This
+   effectively limits the number of unique AS paths to this value. ~0~ means no
+   modulus is applied.
+
+   - 0 ~mod~ no modulus is done all paths will be unique (if incrementing)
+   - 100 ~mod~ this means that every after 100 increments the AS number will
+     wrap so there will be 100 unique AS paths.
+   - 1000 ~mod~ this means that every after 1000 increments the AS number will
+     wrap so there will be 1000 unique AS paths.
+
+   The ~mpack~ value is the number of prefixes to pack into a single update
+   message. By definition all these prefix will share the same path.
+
+   We generated the following files automatically:
+
+   - data/mpath-0-1.raw
+   - data/mpath-0-10.raw
+   - data/mpath-0-1000.raw
+   - data/mpath-100-1.raw
+   - data/mpath-100-10.raw
+   - data/mpath-100-1000.raw
+   - data/mpath-1000-1.raw
+   - data/mpath-1000-10.raw
+   - data/mpath-1000-1000.raw
+   - data/onepath-0-1.raw
+   - data/onepath-0-10.raw
+   - data/onepath-0-1000.raw
+
+** Not used to slow
+*** Go BGP
+**** Using GoBGP
+#+begin_src bash
+  # list neighbor
+  docker-compose exec bgput gobgp neighbor
+
+  # neighbor info
+  docker-compose exec bgput gobgp neighbor 10.0.0.20
+  docker-compose exec bgput gobgp neighbor 10.0.1.31
+
+  # Global RIB
+  gobgp global rib
+
+  # RIB-IN
+  gobgp neighbor 10.0.0.20 adj-in
+  gobgp neighbor 10.0.1.31 adj-in
+
+  # RIB-OUT
+  gobgp neighbor 10.0.0.20 adj-out
+  gobgp neighbor 10.0.1.31 adj-out
+#+end_src
+*** FRR - BGPD
+*** BIRD

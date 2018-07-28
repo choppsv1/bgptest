@@ -13,7 +13,7 @@ services:
   bgput:
     # Huawei
     # image: gitlab.dev.terastrm.net:4567/terastream/vrnetlab/vr-vrp:V100R001C00SPC002
-    image: bgptest
+    image: choppsv1/bgptest
     environment:
       LOCALAS: 30
       PEER_TR_AS: 30
@@ -51,7 +51,7 @@ services:
     sysctls:
       - net.ipv6.conf.all.forwarding=1
   st_1:
-    image: bgptest
+    image: choppsv1/bgptest
     environment:
       LOCALAS: 10
       MAXROUTES: 2500000
@@ -84,7 +84,7 @@ services:
       - net.ipv6.conf.all.forwarding=1
 
   st_2:
-    image: bgptest
+    image: choppsv1/bgptest
     environment:
       LOCALAS: 11
       MAXROUTES: 2500000
@@ -105,7 +105,7 @@ services:
     cap_add:
       - NET_ADMIN
   st_3:
-    image: bgptest
+    image: choppsv1/bgptest
     environment:
       LOCALAS: 12
       MAXROUTES: 2500000
@@ -129,7 +129,7 @@ services:
       - net.ipv6.conf.all.forwarding=1
   # AS 30 - receive 500k/s 2.5M total
   ibgp:
-    image: bgptest
+    image: choppsv1/bgptest
     environment:
       LOCALAS: 30
       PEERAS: 30

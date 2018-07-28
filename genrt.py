@@ -249,7 +249,7 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
 
     for rprefix in prefix.subnets(new_prefix=sublen):
         if (count % 10000) == 0:
-            log.info("routes: {}".format(count), end='\r')
+            print("{} len {} routes: {}".format(prefix, sublen, count), file=sys.stderr, end='\r')
 
         p = packprefix(rprefix)
         plen = len(p)
@@ -273,6 +273,8 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
 
         if count == maxroute:
             break
+
+    print("{} len {} routes: {}".format(prefix, sublen, count), file=sys.stderr)
 
     if mcount:
         write_update(attrs, mpattr, nlri)
@@ -456,7 +458,7 @@ def genroutes(  # pylint: disable=R0913,R0914
 
     for count, rprefix in enumerate(prefix.subnets(new_prefix=sublen)):
         if (seqno % 10000) == 0:
-            print("routes: {}".format(count), file=sys.stderr, end='\r')
+            print("{} len {} routes: {}".format(prefix, sublen, count), file=sys.stderr, end='\r')
 
         if tablefile:
             genroute(tablefile, rprefix, nexthop, aslist, seqno)
@@ -478,7 +480,8 @@ def genroutes(  # pylint: disable=R0913,R0914
         if seqno > 0xFFFFFFFF:
             seqno = 0
 
-    print("\n", file=sys.stderr)
+    print("{} len {} routes: {}".format(prefix, sublen, count), file=sys.stderr)
+
     return seqno
 
 

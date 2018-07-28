@@ -574,11 +574,11 @@ def main():
     parser = argparse.ArgumentParser("BGP injection")
     # parser.add_argument("-a", "--ascii", action="store_true", help="Output ASCII")
     parser.add_argument("-i", "--input", help="Raw data to send")
-    parser.add_argument("-a", "--asn", default="100", help="BGP AS")
+    parser.add_argument("-a", "--asn", default="20", help="BGP AS")
     parser.add_argument(
-        "-l", "--local-ip", default="10.0.0.1", help="BGP Listen IP")
+        "-l", "--local-ip", default="fc20::1", help="BGP Listen IP")
     parser.add_argument(
-        "-r", "--router-id", default="10.0.0.1", help="BGP Router ID")
+        "-r", "--router-id", default="10.0.0.20", help="BGP Router ID")
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("peers", help="EBGP peer (ip,as)")

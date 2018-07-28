@@ -33,6 +33,12 @@ all:
 clean:
 	rm -f data/*.raw data/*.mrt data/*.conf
 
+run: conf upd
+	docker-compose up
+
+stop:
+	docker-compose down
+
 conf: $(CONFFILES)
 
 upd: $(OUPDFILES) $(MUPDFILES)
@@ -62,14 +68,14 @@ data/st-12-static.conf: data/st-10-static.conf
 # Raw Update Message
 # ------------------
 
-$(MUPDFILES): FORCE
+$(MUPDFILES):
 	bash -c 'T1=$@; T2=$${T1#data/}; T=$${T2%.raw}; ARGS=$${T#mpath-}; MPACK=$${ARGS#*-}; MOD=$${ARGS%-*}; ./genrt.py -u $$T1 --root-as-inc --root-as-mod=$$MOD --aspath $(AS_MPATH) --max-pack $$MPACK \
     2100::/13 32 fc$${AS}::$${AS} \
     2110::/21 40 fc$${AS}::$${AS} \
     2120::/28 48 fc$${AS}::$${AS} \
     2130::/45 64 fc$${AS}::$${AS}'
 
-$(OUPDFILES): FORCE
+$(OUPDFILES):
 	bash -c 'T1=$@; T2=$${T1#data/}; T=$${T2%.raw}; ARGS=$${T#onepath-}; MPACK=$${ARGS#*-}; ./genrt.py -u $@ --aspath $(AS_ONEPATH) --max-pack $$MPACK \
     2100::/13 32 fc$${AS}::$${AS} \
     2110::/21 40 fc$${AS}::$${AS} \
