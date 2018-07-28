@@ -113,7 +113,18 @@
    - data/onepath-0-1000.raw
 
 
-** Random Notes:
+** Run Notes:
+
+*** Shell cmd to query IBGP:
+    Use this command to query the IBGP instance in a loop looking at route
+    counts. This is used below to track route count during the runs.
+
+#+begin_src bash
+  while sleep 1; do \
+    printf "%s: " "$(date)"; \
+    docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
+    done
+#+end_src
 
 *** 2.5M routes, 1000 paths 100 prefix per update.
 
@@ -126,21 +137,8 @@
    The sending time is definitely affected by the redistribution in BIRD. The
    next section after this one shows a test with just the BGPUT and the FT
    injecting routes.
-   earlier tests I saw *very* simple (all the same path) setup take just under 3
-   seconds to send 2.5M prefix from ./bgp-inject.py. See the
 
-
-Shell cmd to query IBGP:
-
-#+begin_src bash
-
-  while sleep 1; do \
-    printf "%s: " "$(date)"; \
-    docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
-    done
-#+end_src
-
-Output when using ~./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30~
+**** Output when using ~./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30~
 
 #+begin_src bash
 
@@ -175,7 +173,7 @@ Output when using ~./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30~
 
 #+end_src
 
-Output from ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
+**** Output from ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
 #+begin_src bash
 
   [...]
@@ -237,7 +235,7 @@ Output from ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
   2018-07-28 12:14:06,354: INFO: Sent KeepAlive to (IPv6Address('fc20::1'), 179) sleeping 30s
 #+end_src
 
-** Not used to slow
+** Not used, too slow
 *** Go BGP
 **** Using GoBGP
 #+begin_src bash
@@ -260,4 +258,3 @@ Output from ./bgp-inject.py -i data/mpath-1000-100.raw fc20::1,30
   gobgp neighbor 10.0.1.31 adj-out
 #+end_src
 *** FRR - BGPD
-*** BIRD
