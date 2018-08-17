@@ -11,6 +11,9 @@ import time
 import struct
 import sys
 
+# RFC4271 BGP
+# RFC4760 MPBGP
+
 
 log = logging.getLogger()
 
@@ -159,34 +162,50 @@ def get_aspath_attr(aslist):
 
 
 def get_attrs(aslist, nexthop):
-    # ------
-    # Origin
-    # ------
-    attrs = BGP_ORIGIN_VALUE_IGP
+    attrs = b""
 
-    # -------
-    # AS-PATH
-    # -------
-    attrs += get_aspath_attr(aslist)
+    if nexthop:
+        # ------
+        # Origin
+        # ------
+        attrs += BGP_ORIGIN_VALUE_IGP
 
-    if nexthop.version == 4:
-        # --------
-        # Next-Hop
-        # --------
-        attrs += bytes((BGPAF_TRANS, BGPAT_NEXTHOP, len(nexthop.packed)))
-        assert len(nexthop.packed) == 4
-        attrs += nexthop.packed
-        mpattr = b""
+    if aslist:
+        # -------
+        # AS-PATH
+        # -------
+        attrs += get_aspath_attr(aslist)
+
+    if nexthop:
+        if nexthop.version == 4:
+            # --------
+            # Next-Hop
+            # --------
+            attrs += bytes((BGPAF_TRANS, BGPAT_NEXTHOP, len(nexthop.packed)))
+            assert len(nexthop.packed) == 4
+            attrs += nexthop.packed
+            mpattr = b""
+        else:
+            # Now add IPv6 multiprotocol attr
+            mpattr = bytes((
+                BGPAF_OPTIONAL | BGPAF_LONGLEN,
+                BGPAT_MP_REACH_NLRI,
+            ))
+            # pad for len, afi, safi, nhlen, nh
+            mpattr += struct.pack("!HHBB", 0, MPBGP_IPV6_AFI, MPBGP_UNICAST_SAFI,
+                                len(nexthop.packed))
+            mpattr += nexthop.packed
+            # 0 SNPA
+            mpattr += b"\x00"
     else:
         # Now add IPv6 multiprotocol attr
         mpattr = bytes((
             BGPAF_OPTIONAL | BGPAF_LONGLEN,
-            BGPAT_MP_REACH_NLRI,
+            BGPAT_MP_UNREACH_NLRI,
         ))
         # pad for len, afi, safi, nhlen, nh
-        mpattr += struct.pack("!HHBB", 0, MPBGP_IPV6_AFI, MPBGP_UNICAST_SAFI,
-                              len(nexthop.packed))
-        mpattr += nexthop.packed
+        # XXX check this.
+        mpattr += struct.pack("!HHBB", 0, MPBGP_IPV6_AFI, MPBGP_UNICAST_SAFI, 0)
         # 0 SNPA
         mpattr += b"\x00"
 
@@ -196,6 +215,14 @@ def get_attrs(aslist, nexthop):
 def get_update_header(aslist, nexthop):
     # No withdraw, add attributes
     attrs, mpattr = get_attrs(aslist, nexthop)
+    alen = len(attrs) + len(mpattr)
+    # data = struct.pack("!HH", 0, len(attrs)) + attrs
+    return attrs, mpattr, 4096 - 23 - alen
+
+
+def get_update_withdraw_header():
+    # No withdraw, add attributes
+    attrs, mpattr = get_attrs(None, None)
     alen = len(attrs) + len(mpattr)
     # data = struct.pack("!HH", 0, len(attrs)) + attrs
     return attrs, mpattr, 4096 - 23 - alen
@@ -281,6 +308,79 @@ def gen_routes_update(  # pylint: disable=R0913,R0914
         ucount += 1
 
     return ucount, count
+
+#
+# Write updates full of withdraws.
+#
+def gen_routes_withdraw(outfile, prefix, sublen, maxpack, maxroute):
+    count, ucount = 0, 0
+
+    def write_update(attrs, mpattr, nlri):
+        # BGP Header: marker[16], len[2], type[1]
+        alen = len(attrs)
+        if mpattr:
+            alen = len(attrs) + len(mpattr) + len(nlri)
+            mlen = alen
+        else:
+            alen = len(attrs)
+            mlen = alen + len(nlri)
+        # message len is + 16 (marker) + 2 (len) + 1 (type) + 2 (withlen) + 2 (attrlen)
+        msghdr = bytes((0xff, )) * 16 + \
+            struct.pack("!HB", mlen + 23, BGP_MSGTYPE_UPDATE) + \
+            struct.pack("!HH", 0, alen) # 0 withdraw, attrlen
+        # header
+        outfile.write(msghdr)
+        # attrs
+        outfile.write(attrs)
+        if mpattr:
+            # mpattr 1 flags, 1 type, 2 length of mpattr value + nlri, rest of mpattr and nrli
+            mplen = len(mpattr[4:]) + len(nlri)
+            mpattr = mpattr[:2] + struct.pack("!H", mplen) + mpattr[4:]
+            outfile.write(mpattr)
+        outfile.write(nlri)
+
+    attrs, mpattr, remain = get_update_withdraw_header()
+    nlri = b""
+    ucount = 0
+    mcount = 0
+    count = 0
+
+    for rprefix in prefix.subnets(new_prefix=sublen):
+        if (count % 10000) == 0:
+            print("{} len {} routes: {}".format(prefix, sublen, count), file=sys.stderr, end='\r')
+
+        p = packprefix(rprefix)
+        plen = len(p)
+
+        if plen > remain or mcount == maxpack:
+            write_update(attrs, mpattr, nlri)
+            ucount += 1
+            # Possibly update the AS PATH
+            if incroot:
+                aslist[-1] += 1
+                if modroot:
+                    aslist[-1] = rootas + (rootas - aslist[-1]) % modroot
+            attrs, mpattr, remain = get_update_header(aslist, nexthop)
+            nlri = b""
+            mcount = 0
+
+        nlri += p
+        remain -= plen
+        count += 1
+        mcount += 1
+
+        if count == maxroute:
+            break
+
+    print("{} len {} routes: {}".format(prefix, sublen, count), file=sys.stderr)
+
+    if mcount:
+        write_update(attrs, mpattr, nlri)
+        ucount += 1
+
+    return ucount, count
+
+    return count, ucount
 
 
 # ---------
@@ -498,12 +598,37 @@ def triples(l):
         return
 
 
+def tuples(l):
+    i = iter(l)
+    try:
+        while True:
+            yield next(i), next(i)
+    except StopIteration:
+        return
+
+
+
+def write_withdraw_file(outfile, pfxpairs, maxpack, maxroute):
+    routecount = 0
+    updatecount = 0
+    for pfx, sublen in tuples(pfxpairs):
+        prefix = ipaddress.ip_network(pfx)
+        ucount, count = gen_routes_withdraw(outfile, prefix, int(sublen), maxpack, maxroute)
+        updatecount += ucount
+        routecount += count
+        maxroute -= count
+        if maxroute <= 0:
+            break
+    return routecount, updatecount
+
+
 def main():
-    parser = argparse.ArgumentParser("Inject BGP route file into peer")
+    parser = argparse.ArgumentParser("Create BGP route file for sending to peer")
     parser.add_argument(
         "--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
-        "--dump-format", default="    {prefix} via {nexthop};", help="Format to use for format dumped")
+        "--dump-format", default="    {prefix} via {nexthop};",
+        help="Format to use for format dumped")
     parser.add_argument(
         "--aspath", default="20", help="comma sep list of asnumbers")
     parser.add_argument(
@@ -518,11 +643,11 @@ def main():
         "--max-pack",
         type=int,
         default=0xFFFF,
-        help="Maximum number of prefixes to generate [default: 4 billion]")
+        help="Maximum number of prefixes to pack in an update [default: 0xFFFF]")
     parser.add_argument(
         "-p",
         "--peers",
-        help="Space sep list of peers in form peerid,peerip,peeras")
+        help="Space sep list of peers in form peerid,peerip,peeras for MRT")
     parser.add_argument(
         "--root-as-inc", action="store_true", help="increment the root as")
     parser.add_argument(
@@ -534,8 +659,11 @@ def main():
         "-t", "--tabledump", help="File to write MRT table dump into")
     parser.add_argument(
         "-u", "--update", help="File to write BGP updates into")
+    parser.add_argument("-w", "--withdraw",
+                        help="File to write BGP withdraws into")
     parser.add_argument(
-        "tuples", nargs="*", help="PREFIX SUBLEN NEXTHOP pairs")
+        "tuples", nargs="*", help="PREFIX SUBLEN [ NEXTHOP ] tuple/pairs (no nexthop for withdraw)")
+
     args = parser.parse_args()
 
     logging.basicConfig()
@@ -545,6 +673,27 @@ def main():
     modroot = args.root_as_mod
     maxroute = args.max_routes
     maxpack = args.max_pack
+
+    if args.withdraw:
+        if args.update or args.tabledump or args.format_file:
+            log.error("Withdraw and update args are mutually exclusive")
+            sys.exit(1)
+
+        if args.withdraw == "-":
+            outfile = sys.stdout.buffer
+        else:
+            outfile = open(args.update, "wb")
+
+        if len(args.tuples) % 2:
+            log.error("PREFIX SUBLEN must come in pairs\n")
+            sys.exit(1)
+
+        routecount, updatecount = \
+            write_withdraw_file(outfile, args.tuples, maxpack, maxroute)
+
+        log.info("Wrote {} BGP updates with {} total NLRI".format(
+            updatecount, routecount))
+        sys.exit(0)
 
     if len(args.tuples) % 3:
         log.error("Prefix sublen args must come in triples\n")
