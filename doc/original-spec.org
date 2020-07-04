@@ -36,10 +36,8 @@ target is, send and receive 1M prefixes / second.
 
 * Original Email
 
-I need help, I need a program that can send/recive BGP updates for testing
-of routers at a rate of some 500K messgaes/sec.
-
-I need something to test BGP speaking routers with.
+A program that can send/recive BGP updates for testing of routers at a rate of
+some 500K messgaes/sec.
 
 It needs to be able to send 2.5M IPv6 "routes" at a speed of at least
 500K_updates/second.
@@ -55,40 +53,33 @@ It has two sessions using two interfaces and two different sub-nets:
 
 The EBGP transmitter:
 
-The EBGP speaker is in AS 20 and talks to the router under test in
- AS 30.
+The EBGP speaker is in AS 20 and talks to the router under test in AS 30.
 
 The idea is to:
 
-             - Send 2.5M UP prefixes Wait for a trigger that the BGP
-               receiver
-             - Loop:
-                - Send 250K DOWN from the previous UP
-                - Send 250K UP with some new prefixes
-                - Wait for a trigger that the BGP receiver
-                - Goto Loop:
-
+  - Send 2.5M UP prefixes Wait for a trigger that the BGP
+    receiver
+  - Loop:
+    - Send 250K DOWN from the previous UP
+    - Send 250K UP with some new prefixes
+    - Wait for a trigger that the BGP receiver
+    - Goto Loop:
 
 The IBGP listener:
 
 The IBGP listener is in AS 30. The IBGP listener needs to be able to
 handle 10.250M prefixes.
 
-There are three "normal" testers "ST1-ST3" sending 2.5M prefixes each
-in to the router we are trying to test. They send prefixes according
-to
-the list below. A table of the actual announcements will be available
-in the next update of this document. ST1-ST3 are "static", we bring
-them up at the beginning of the test and after that we leave them
-stable.
+There are three "normal" testers "ST1-ST3" sending 2.5M prefixes each in to the
+router we are trying to test. They send prefixes according to the list below. A
+table of the actual announcements will be available in the next update of this
+document. ST1-ST3 are "static", we bring them up at the beginning of the test
+and after that we leave them stable.
 
-The EBGP speaker in the FT tester sends prefixes that are more
-specific
-out of the blocks announced by ST1-ST3. The IBGP listener receives
-IBGP
-updates from the router under tests and verifies hat we receive all
-prefixes with the correct next hop. It needs to be able to process
-the UP nd DOWN messages.
+The EBGP speaker in the FT tester sends prefixes that are more specific out of
+the blocks announced by ST1-ST3. The IBGP listener receives IBGP updates from
+the router under tests and verifies hat we receive all prefixes with the correct
+next hop. It needs to be able to process the UP nd DOWN messages.
 
 When the information on the IBGP session matches what we have sent to
 the router under test, a trigger is provided for the speaker.
@@ -109,15 +100,14 @@ The actual test:
 
 
 The purpose of this test is to evaluate several capabilities:
-- handling of BGP resilience without losing BGP session when processes
-fail
-- handling of BGP process upgrades without losing BGP sessions or BGP
-information
-- process BGP updates at a speed of 500K updates/second or better
-- handle more than 10M prefixes (routes)
+
+  - handling of BGP resilience without losing BGP session when processes fail
+  - handling of BGP process upgrades without losing BGP sessions or BGP
+    information
+  - process BGP updates at a speed of 500K updates/second or better
+  - handle more than 10M prefixes (routes)
 
 The diagram below shows the setup of the test:
-
 
        +-----------------------------------------------+
        |                    R2                         |
@@ -146,21 +136,17 @@ The diagram below shows the setup of the test:
            |1 |     |2 |     |3 |     |  |     |  |
            +-++     +-++     ++-+     ++-+     ++-+
 
+- R2 :: The thing you are supposed to build
+- ST :: Standard Tester, provided by vendor, sends a static set of BGP routes
+- FT :: Fast Tester, provided by Telekom, sends dynamic updates at high speed
+- TR :: Test Router, provided by Telekom, receives IBGP routes from R2 (*L*) "Loop-back address/interface"
 
-R2 The thing you are supposed to build
-ST Standard Tester, provided by vendor, sends a static set of BGP
-routes
-FT Fast Tester, provided by Telekom, sends dynamic updates at high
-speed
-TR Test Router, provided by Telekom, receives IBGP routes from R2
-(*L*) "Loop-back address/interface"
-
-We expect 5 BGP instances to be running inside the R2 on separate
-hardware, so we can physically fail them during the test.
+We expect 5 BGP instances to be running inside the R2 on separate hardware, so
+we can physically fail them during the test.
 
 The BGP processes needs to have an indicator to tell if they are
-booting/synchronized or if they are active and synchronized with the
-rest of the system.
+booting/synchronized or if they are active and synchronized with the rest of the
+system.
 
 All external links are 10GE.
 
@@ -175,20 +161,17 @@ ST 3    AS 12       EBGP  2,500 000 prefixes static
 FT      AS 20       EBGP  2,500 000 prefixes dynamic updates
 TR      AS 30       IBGP
 
-All links are /64 IPv6 sub nets, address ::1 on R2, ::2 on external
-peer.
+All links are /64 IPv6 sub nets, address ::1 on R2, ::2 on external peer.
 The loop-back has it's own /64 and is address ::1
 
-TR speaks IBGP to R2 Loop-back from it's link address (::2) and points
-a default route at the R2 address of the attached link. (::1).
+TR speaks IBGP to R2 Loop-back from it's link address (::2) and points a default
+route at the R2 address of the attached link. (::1).
 
-The R2 should have 5 10GE links to an external "routers". These links
-should go over 5 different "line cards", where "line cards" can be
-implemented any way the vendor desires. Vendor decided infrastructure
-connects the "line-cards" and the separate processing resources that
-runs the BGP processes. In this test we do NOT run the BGP process on
-the line-card CPU's.
-
+The R2 should have 5 10GE links to an external "routers". These links should go
+over 5 different "line cards", where "line cards" can be implemented any way the
+vendor desires. Vendor decided infrastructure connects the "line-cards" and the
+separate processing resources that runs the BGP processes. In this test we do
+NOT run the BGP process on the line-card CPU's.
 
 Test setup:
 
@@ -225,7 +208,6 @@ routes can be sent in 5 seconds.  Verify that TR has received all 10M
 routes and that it's stable. If it takes longer than 50 seconds we end
 the test and schedule a re-test at a later time.
 
-
 Test 2:
 
 Set FT to send periodic update blocks of 500K routes that overlaps
@@ -253,6 +235,7 @@ test 1 running.
 
 
 Test 3: session reliability.
+
 The purpose of the test is to verify if the BGP session stays up
 when instances fails.
 
@@ -276,9 +259,11 @@ when instances fails.
 - Bring Back BGP4, verify nothing happens on ST1-TS3, FT and TR
 - Bring Back BGP5, verify nothing happens on ST1-TS3, FT and TR
 
-Test 4: Verify if BGP instances can be upgraded without losing the BGP
-sessions
-or strange updates sent to TR.
+Test 4:
+
+Verify if BGP instances can be upgraded without losing the BGP sessions or
+strange updates sent to TR.
+
 - Insert all 5 BGP processes
 - start Test 2 in the loop mode
 - verify that TR receives all routes
@@ -301,11 +286,12 @@ updates
 - wait until BGP2 and BGP4 is "green"
 
 Test 5;
+
 - Explain how the system makes sure that what is sent out to other BGP
 speakers are actually installed in the physical forwarding path.
 
 Test 6:
-- go to restaurant have meat with peppercorn sauce, potato and red
-wine
+
+- go to restaurant have meat with peppercorn sauce, potato and red wine
 - thanks, good work
 

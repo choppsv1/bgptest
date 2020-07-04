@@ -17,16 +17,16 @@ OUPDFILES := $(patsubst %,data/%.raw,$(OSUPDFILES))
 MRTFILES := $(patsubst %,data/%.mrt,$(SMRTFILES))
 CONFFILES := $(patsubst %,data/%-static.conf,$(SMRTFILES))
 
+ifeq ($(FRR),1)
+COMPFILE ?= frr-compose.yml
+else
+COMPFILE ?= docker-compose.yml
+endif
+
 all:
 
 clean:
 	rm -f data/*.raw data/*.mrt data/*.conf
-
-start run up: conf upd
-	docker-compose up
-
-down stop:
-	docker-compose down
 
 conf: $(CONFFILES)
 
@@ -35,6 +35,25 @@ upd: $(OUPDFILES) $(MUPDFILES)
 setup:
 	test -d venv || (python3 -m venv venv; echo $$(pwd)/venv > .venv)
 	. venv/bin/activate && pip install -r requirements.txt
+
+# ------------------
+# Simulation targets
+# ------------------
+
+build:
+	make -C docker
+
+start run up: conf upd
+	docker-compose -f $(COMPFILE) up
+
+down stop:
+	docker-compose -f $(COMPFILE) down
+
+watch:
+	while sleep 1; do \
+		printf "%s: " "$$(date)"; \
+		docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
+	done
 
 # -------------------
 # Static Route Config

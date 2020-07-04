@@ -31,6 +31,21 @@
     connection established.
 
 ** Running the simulation.
+
+   The physical test is intended to be run with 4
+
+ #+begin_src picture
+   +---------------------------------+        +------+
+   |              bgput              |--------| ibgp |
+   +---------------------------------+  IBGP  +------+
+       |        |        |       |
+       |        |  EBGP  |       |
+       |        |        |       |
+   +------+ +------+ +------+ +------+
+   | st-1 | | st-1 | | st-1 | |  ft  |
+   +------+ +------+ +------+ +------+
+ #+end_src
+
    To generate all the required configs and bringup the simulation one can
    simply
 
@@ -59,7 +74,25 @@
 
    To bring down the simualtion use ~make stop~.
 
+** Checking Results On The Simulation.
+
+   To check the wall clock time that it takes for the simulation to launch and
+   stabilize (or for the injected routes to be processed) one can run the
+   following command. This can be run prior to launching the simulation.
+
+   : make watch
+
+   The command is watching for the number of routes received by the IBGP
+   neighbor from the BGP under test. (~bgput~). On launch all of these routes
+   will be from the static configuration EBGP neighbors of ~bgput~, namely,
+   ~st-1~, ~st-1~, ~st-1~, who each contribute 2.5M routes.
+
+   For a physical router setup a similar command to what ~make watch~ is running
+   should be used to query the installed routes on the ~ibgp~ router. See the
+   ~Makefile~ for what the watch target is doing.
+
 ** Running the test.
+
    These instructions assume the simulation has been launched with ~make run~
    from above. In a physical router setup the connectivity would need to be in
    place and the addresses adjusted accordingly (if needed).
@@ -235,8 +268,112 @@
   2018-07-28 12:14:06,354: INFO: Sent KeepAlive to (IPv6Address('fc20::1'), 179) sleeping 30s
 #+end_src
 
-** Not used, too slow
+** Not Used, Too Slow Notes
+
+   Other BGP implementations were tested before settling on BIRD6 as the BGP of
+   choice for the simulation. These other BGPs were significantly slower than
+   BIRD which is why they were not chosen.
+
+*** FRR - BGPD
+
+    Testing with FRR ~BGPD~ as ~bgput~ and ~bird6~ as all other routers
+    (~st-{1,2,3}~, ~ibgp~).
+
+    In order to test with the latest FRR one should rebuild the docker test
+    image locally with:
+
+    : make build
+
+    In order to run the test with FRR one should pass ~FRR=1~ to the make
+    command.
+
+    : make FRR=1 run
+
+    *NOTE* The injection test fails with ~BGPD~. The connection is opened and
+    the updates are sent but not processed. This should be investigated further;
+    however, the launch test should serve as a test for now to improve timings.
+
+**** Launch timing.
+
+     FRR launch/stabilize time is ~4 times slower than bird (app. 61s vs 17s)
+
+#+begin_src bash
+  (default) [05:54:38 dak:~/w/bgptest]$ make watch
+  while sleep 1; do \
+          printf "%s: " "$(date)"; \
+          docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
+  done
+  Sat Jul  4 05:56:00 EDT 2020: ERROR: No container found for ibgp_1
+  Sat Jul  4 05:56:01 EDT 2020: ERROR: No container found for ibgp_1
+  Sat Jul  4 05:56:03 EDT 2020:   Routes:         0 imported, 0 exported, 0 preferred
+  Sat Jul  4 05:56:04 EDT 2020:   Routes:         0 imported, 1 exported, 0 preferred
+  Sat Jul  4 05:56:06 EDT 2020:   Routes:         0 imported, 1 exported, 0 preferred
+  Sat Jul  4 05:56:08 EDT 2020:   Routes:         0 imported, 1 exported, 0 preferred
+  Sat Jul  4 05:56:09 EDT 2020:   Routes:         0 imported, 1 exported, 0 preferred
+  Sat Jul  4 05:56:11 EDT 2020:   Routes:         202496 imported, 1 exported, 202496 preferred
+  Sat Jul  4 05:56:13 EDT 2020:   Routes:         448256 imported, 1 exported, 448256 preferred
+  Sat Jul  4 05:56:15 EDT 2020:   Routes:         686336 imported, 1 exported, 686336 preferred
+  Sat Jul  4 05:56:16 EDT 2020:   Routes:         939776 imported, 1 exported, 939776 preferred
+  Sat Jul  4 05:56:18 EDT 2020:   Routes:         1170176 imported, 1 exported, 1170176 preferred
+  Sat Jul  4 05:56:20 EDT 2020:   Routes:         1446656 imported, 1 exported, 1446656 preferred
+  Sat Jul  4 05:56:21 EDT 2020:   Routes:         1700096 imported, 1 exported, 1700096 preferred
+  Sat Jul  4 05:56:23 EDT 2020:   Routes:         1953536 imported, 1 exported, 1953536 preferred
+  Sat Jul  4 05:56:25 EDT 2020:   Routes:         2130176 imported, 1 exported, 2130176 preferred
+  Sat Jul  4 05:56:26 EDT 2020:   Routes:         2398976 imported, 1 exported, 2398976 preferred
+  Sat Jul  4 05:56:28 EDT 2020:   Routes:         2647296 imported, 1 exported, 2647296 preferred
+  Sat Jul  4 05:56:30 EDT 2020:   Routes:         2890496 imported, 1 exported, 2890496 preferred
+  Sat Jul  4 05:56:31 EDT 2020:   Routes:         3143936 imported, 1 exported, 3143936 preferred
+  Sat Jul  4 05:56:33 EDT 2020:   Routes:         3389696 imported, 1 exported, 3389696 preferred
+  Sat Jul  4 05:56:35 EDT 2020:   Routes:         3635456 imported, 1 exported, 3635456 preferred
+  Sat Jul  4 05:56:36 EDT 2020:   Routes:         3869023 imported, 1 exported, 3869023 preferred
+  Sat Jul  4 05:56:38 EDT 2020:   Routes:         4103936 imported, 1 exported, 4103936 preferred
+  Sat Jul  4 05:56:40 EDT 2020:   Routes:         4226816 imported, 1 exported, 4226816 preferred
+  Sat Jul  4 05:56:41 EDT 2020:   Routes:         4472576 imported, 1 exported, 4472576 preferred
+  Sat Jul  4 05:56:43 EDT 2020:   Routes:         4697856 imported, 1 exported, 4697856 preferred
+  Sat Jul  4 05:56:45 EDT 2020:   Routes:         4948736 imported, 1 exported, 4948736 preferred
+  Sat Jul  4 05:56:46 EDT 2020:   Routes:         5202176 imported, 1 exported, 5202176 preferred
+  Sat Jul  4 05:56:48 EDT 2020:   Routes:         5447936 imported, 1 exported, 5447936 preferred
+  Sat Jul  4 05:56:50 EDT 2020:   Routes:         5693696 imported, 1 exported, 5693696 preferred
+  Sat Jul  4 05:56:51 EDT 2020:   Routes:         5939456 imported, 1 exported, 5939456 preferred
+  Sat Jul  4 05:56:53 EDT 2020:   Routes:         6185216 imported, 1 exported, 6185216 preferred
+  Sat Jul  4 05:56:55 EDT 2020:   Routes:         6415824 imported, 1 exported, 6415824 preferred
+  Sat Jul  4 05:56:56 EDT 2020:   Routes:         6665134 imported, 1 exported, 6665134 preferred
+  Sat Jul  4 05:56:58 EDT 2020:   Routes:         6922496 imported, 1 exported, 6922496 preferred
+  Sat Jul  4 05:56:59 EDT 2020:   Routes:         7168256 imported, 1 exported, 7168256 preferred
+  Sat Jul  4 05:57:01 EDT 2020:   Routes:         7390976 imported, 1 exported, 7390976 preferred
+  Sat Jul  4 05:57:03 EDT 2020:   Routes:         7631616 imported, 1 exported, 7631616 preferred
+  Sat Jul  4 05:57:04 EDT 2020:   Routes:         7864320 imported, 1 exported, 7864320 preferred
+  Sat Jul  4 05:57:06 EDT 2020:   Routes:         7864320 imported, 1 exported, 7864320 preferred
+#+end_src
+
+     Compare this with a ~bird6~ only  run.
+
+#+begin_src bash
+(default) [05:59:30 dak:~/w/bgptest]$ make watch
+while sleep 1; do \
+        printf "%s: " "$(date)"; \
+        docker-compose exec ibgp birdc6 show proto all bgp_30 | grep Routes:; \
+done
+Sat Jul  4 06:01:47 EDT 2020: ERROR: No container found for ibgp_1
+Sat Jul  4 06:01:49 EDT 2020: ERROR: No container found for ibgp_1
+Sat Jul  4 06:01:50 EDT 2020:   Routes:         0 imported, 0 exported, 0 preferred
+Sat Jul  4 06:01:52 EDT 2020:   Routes:         0 imported, 0 exported, 0 preferred
+Sat Jul  4 06:01:54 EDT 2020:   Routes:         0 imported, 0 exported, 0 preferred
+Sat Jul  4 06:01:55 EDT 2020:   Routes:         6 imported, 1 exported, 4 preferred
+Sat Jul  4 06:01:57 EDT 2020:   Routes:         6 imported, 1 exported, 4 preferred
+Sat Jul  4 06:01:59 EDT 2020:   Routes:         958454 imported, 1 exported, 958452 preferred
+Sat Jul  4 06:02:01 EDT 2020:   Routes:         2302621 imported, 1 exported, 2302619 preferred
+Sat Jul  4 06:02:02 EDT 2020:   Routes:         3773799 imported, 1 exported, 3773797 preferred
+Sat Jul  4 06:02:04 EDT 2020:   Routes:         5254974 imported, 1 exported, 5254972 preferred
+Sat Jul  4 06:02:06 EDT 2020:   Routes:         6688515 imported, 1 exported, 6688513 preferred
+Sat Jul  4 06:02:07 EDT 2020:   Routes:         7864326 imported, 1 exported, 7864324 preferred
+Sat Jul  4 06:02:09 EDT 2020:   Routes:         7864326 imported, 1 exported, 7864324 preferred
+#+end_src
+
 *** Go BGP
+
+    Some archival commands used when initially testing with gobgp.
+
 **** Using GoBGP
 #+begin_src bash
   # list neighbor
@@ -257,4 +394,3 @@
   gobgp neighbor 10.0.0.20 adj-out
   gobgp neighbor 10.0.1.31 adj-out
 #+end_src
-*** FRR - BGPD

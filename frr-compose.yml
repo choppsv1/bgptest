@@ -1,0 +1,192 @@
+version: "2.1"
+
+# AS 20 - inject 500k/s 2.5M total - remote AS 30
+# Single interface.
+# - Wait for trigger that the BGP receiver [? chopps: has got them?]
+# - Loop
+#   - Send 250K DOWN from previous set
+#   - Send 250K UP new prefixes (not sent previously).
+#   - Wait for trigger that the BGP receiver [? chopps: has got them?]
+
+services:
+  # AS 30 - receive 500k/s 2.5M total
+  bgput:
+    # Huawei
+    # image: gitlab.dev.terastrm.net:4567/terastream/vrnetlab/vr-vrp:V100R001C00SPC002
+    image: choppsv1/bgptest
+    environment:
+      LOCALAS: 30
+      PEER_TR_AS: 30
+      PEER_TR_IP: fc30::2
+      PEER_FT_AS: 20
+      PEER_FT_IP: fc20::2
+      PEER_ST1_AS: 10
+      PEER_ST1_IP: fc10::2
+      PEER_ST2_AS: 11
+      PEER_ST2_IP: fc11::2
+      PEER_ST3_AS: 12
+      PEER_ST3_IP: fc12::2
+      ROUTERID: 192.168.30.1
+    command:
+      - bash
+      - -c
+      - >-
+          sed -i -e 's/bgpd=.*$$/bgpd=yes/' /etc/frr/daemons &&
+          envsubst < /bgptest/conf/frr-bgput-frr.conf.tpl > /etc/frr/frr.conf &&
+          /usr/lib/frr/frrinit.sh start &&
+          vtysh -c 'debug bgp neighbor' &&
+          tail -f /var/log/frr/system.log
+    volumes:
+      - .:/bgptest
+    networks:
+      ebgpnet:
+        ipv6_address: fc20::1
+      st1net:
+        ipv6_address: fc10::1
+      st2net:
+        ipv6_address: fc11::1
+      st3net:
+        ipv6_address: fc12::1
+      ibgpnet:
+        ipv6_address: fc30::1
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
+  st_1:
+    image: choppsv1/bgptest
+    environment:
+      LOCALAS: 10
+      MAXROUTES: 2500000
+      PEERIP: fc10::1
+      PEERAS: 30
+      ROUTERID: 192.168.10.2
+    # command:
+    #   - bash
+    #   - -c
+    #   - envsubst < /bgptest/conf/gobgp-conf.tpl > /tmp/gobgp-conf.yml;
+    #     gobgpd -t yaml -f /tmp/gobgp-conf.yml &;
+    #     sleep 5;
+    #     echo "Injecting Routes";
+    #     gobgp mrt inject global /bgptest/data/st-10.mrt;
+    #     gobgp monitor
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/bird6-ebgp.tpl > /etc/bird6.conf;
+        ip -6 addr add fd$${LOCALAS}::1 dev lo;
+        bird6 -dc /etc/bird6.conf;
+    networks:
+      st1net:
+        ipv6_address: fc10::2
+    volumes:
+      - .:/bgptest
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
+  st_2:
+    image: choppsv1/bgptest
+    environment:
+      LOCALAS: 11
+      MAXROUTES: 2500000
+      PEERIP: fc11::1
+      PEERAS: 30
+      ROUTERID: 192.168.11.2
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/bird6-ebgp.tpl > /etc/bird6.conf;
+        ip -6 addr add fd$${LOCALAS}::1 dev lo;
+        bird6 -dc /etc/bird6.conf;
+    networks:
+      st2net:
+        ipv6_address: fc11::2
+    volumes:
+      - .:/bgptest
+    cap_add:
+      - NET_ADMIN
+  st_3:
+    image: choppsv1/bgptest
+    environment:
+      LOCALAS: 12
+      MAXROUTES: 2500000
+      PEERIP: fc12::1
+      PEERAS: 30
+      ROUTERID: 192.168.12.2
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/bird6-ebgp.tpl > /etc/bird6.conf;
+        ip -6 addr add fd$${LOCALAS}::1 dev lo;
+        bird6 -dc /etc/bird6.conf;
+    networks:
+      st3net:
+        ipv6_address: fc12::2
+    volumes:
+      - .:/bgptest
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
+  # AS 30 - receive 500k/s 2.5M total
+  ibgp:
+    image: choppsv1/bgptest
+    environment:
+      LOCALAS: 30
+      PEERAS: 30
+      PEERIP: fc30::1
+      ROUTERID: 192.168.30.2
+    command:
+      - bash
+      - -c
+      - envsubst < /bgptest/conf/bird6-ibgp.tpl > /etc/bird6.conf;
+        bird6 -dc /etc/bird6.conf;
+      # ip -6 addr add fd$${LOCALAS}::2 dev lo;
+    volumes:
+      - .:/bgptest
+    networks:
+      ibgpnet:
+        ipv6_address: fc30::2
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
+
+networks:
+  st1net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc10::/64
+          gateway: fc10::ffff
+  st2net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc11::/64
+          gateway: fc11::ffff
+  st3net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc12::/64
+          gateway: fc12::ffff
+  ebgpnet:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc20::/64
+          gateway: fc20::2
+  ibgpnet:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fc30::/64
+          gateway: fc30::ffff
